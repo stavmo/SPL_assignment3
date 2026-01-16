@@ -101,7 +101,10 @@ public class Reactor<T> implements Server<T> {
         clientChan.configureBlocking(false);
 
         int connectionId = nextId.getAndIncrement(); //
-        
+
+        //StompMessagingProtocol<T> protocol = protocolFactory.get();  //will implement after STOMP is implemented
+        //protocol.start(connectionId, connections);
+
 
         final NonBlockingConnectionHandler<T> handler = new NonBlockingConnectionHandler<>(
                 readerFactory.get(),
