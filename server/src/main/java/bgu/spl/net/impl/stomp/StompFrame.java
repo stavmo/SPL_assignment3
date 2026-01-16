@@ -16,6 +16,7 @@ public class StompFrame {
     final private Vector<Header> headers;
     final private String body;
 
+
     public StompFrame(FrameType type, String body, Vector<Header> headers) {
         this.type = type;
         this.body = body;
@@ -78,6 +79,15 @@ public class StompFrame {
 
     public Vector<Header> getHeaders() {
         return headers;
+    }
+
+    public String getHeaderValue(String key) {
+        for (Header header : headers) {
+            if (header.getKey().equals(key)) {
+                return header.getValue();
+            }
+        }
+        return "";
     }
 
     public static class Header {

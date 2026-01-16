@@ -12,6 +12,7 @@
     <property name="java.vm.name" value="OpenJDK 64-Bit Server VM"/>
     <property name="user.country" value="US"/>
     <property name="sun.java.launcher" value="SUN_STANDARD"/>
+    <property name="test" value="StompFrameTest"/>
     <property name="java.vm.specification.name" value="Java Virtual Machine Specification"/>
     <property name="user.dir" value="/workspace/SPL_assignment3/server"/>
     <property name="java.vm.compressedOopsMode" value="32-bit"/>
@@ -42,7 +43,7 @@
     <property name="java.class.path" value="/usr/share/maven/boot/plexus-classworlds-2.x.jar"/>
     <property name="java.vm.specification.version" value="21"/>
     <property name="sun.arch.data.model" value="64"/>
-    <property name="sun.java.command" value="org.codehaus.plexus.classworlds.launcher.Launcher test"/>
+    <property name="sun.java.command" value="org.codehaus.plexus.classworlds.launcher.Launcher test -Dtest=StompFrameTest"/>
     <property name="java.home" value="/usr/lib/jvm/temurin-21-jdk-amd64"/>
     <property name="user.language" value="en"/>
     <property name="java.specification.vendor" value="Oracle Corporation"/>
@@ -58,17 +59,17 @@
     <property name="sun.cpu.endian" value="little"/>
     <property name="java.vendor.version" value="Temurin-21.0.9+10"/>
   </properties>
-  <testcase classname="bgu.spl.net.impl.stomp.StompFrameTest" name="bgu.spl.net.impl.stomp.StompFrameTest.testBodyWithSpecialCharacters" time="0.003"/>
-  <testcase classname="bgu.spl.net.impl.stomp.StompFrameTest" name="bgu.spl.net.impl.stomp.StompFrameTest.testParsingFrameWithHeaderColonInValue" time="0"/>
+  <testcase classname="bgu.spl.net.impl.stomp.StompFrameTest" name="bgu.spl.net.impl.stomp.StompFrameTest.testHeaderWithSpecialCharacters" time="0.004"/>
+  <testcase classname="bgu.spl.net.impl.stomp.StompFrameTest" name="bgu.spl.net.impl.stomp.StompFrameTest.testBodyWithSpecialCharacters" time="0"/>
+  <testcase classname="bgu.spl.net.impl.stomp.StompFrameTest" name="bgu.spl.net.impl.stomp.StompFrameTest.testParsingFrameWithHeaderColonInValue" time="0.001"/>
   <testcase classname="bgu.spl.net.impl.stomp.StompFrameTest" name="bgu.spl.net.impl.stomp.StompFrameTest.testEmptyFrame" time="0.001"/>
-  <testcase classname="bgu.spl.net.impl.stomp.StompFrameTest" name="bgu.spl.net.impl.stomp.StompFrameTest.testStompFrameParsingWithNoBody" time="0.001"/>
-  <testcase classname="bgu.spl.net.impl.stomp.StompFrameTest" name="bgu.spl.net.impl.stomp.StompFrameTest.testStompFrameParsingWithNoHeaders" time="0"/>
+  <testcase classname="bgu.spl.net.impl.stomp.StompFrameTest" name="bgu.spl.net.impl.stomp.StompFrameTest.testStompFrameParsingWithNoBody" time="0"/>
+  <testcase classname="bgu.spl.net.impl.stomp.StompFrameTest" name="bgu.spl.net.impl.stomp.StompFrameTest.testStompFrameParsingWithNoHeaders" time="0.001"/>
   <testcase classname="bgu.spl.net.impl.stomp.StompFrameTest" name="bgu.spl.net.impl.stomp.StompFrameTest.testToStringMethod" time="0"/>
   <testcase classname="bgu.spl.net.impl.stomp.StompFrameTest" name="bgu.spl.net.impl.stomp.StompFrameTest.testToStringRoundTrip" time="0"/>
-  <testcase classname="bgu.spl.net.impl.stomp.StompFrameTest" name="bgu.spl.net.impl.stomp.StompFrameTest.testHeaderGetters" time="0.001"/>
+  <testcase classname="bgu.spl.net.impl.stomp.StompFrameTest" name="bgu.spl.net.impl.stomp.StompFrameTest.testHeaderGetters" time="0"/>
   <testcase classname="bgu.spl.net.impl.stomp.StompFrameTest" name="bgu.spl.net.impl.stomp.StompFrameTest.testFrameGetters" time="0"/>
   <testcase classname="bgu.spl.net.impl.stomp.StompFrameTest" name="bgu.spl.net.impl.stomp.StompFrameTest.testDifferentFrameTypes" time="0"/>
-  <testcase classname="bgu.spl.net.impl.stomp.StompFrameTest" name="bgu.spl.net.impl.stomp.StompFrameTest.testHeaderWithSpecialCharacters" time="0.001"/>
   <testcase classname="bgu.spl.net.impl.stomp.StompFrameTest" name="bgu.spl.net.impl.stomp.StompFrameTest.testStompFrameConstructorWithParameters" time="0"/>
   <testcase classname="bgu.spl.net.impl.stomp.StompFrameTest" name="bgu.spl.net.impl.stomp.StompFrameTest.testStompFrameConstructorWithEmptyBody" time="0"/>
   <testcase classname="bgu.spl.net.impl.stomp.StompFrameTest" name="bgu.spl.net.impl.stomp.StompFrameTest.testStompFrameConstructorWithNullHeaders" time="0"/>
