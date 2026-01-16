@@ -22,6 +22,8 @@ public class StompFrame {
         this.headers = headers;
     }
 
+
+    //this constructor parses a raw frame string into a StompFrame object
     public StompFrame(String rawFrame) {
         // Remove trailing null terminator if present
         if (rawFrame.endsWith("\0")) {
