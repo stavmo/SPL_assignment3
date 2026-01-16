@@ -111,7 +111,7 @@ public class Reactor<T> implements Server<T> {
                 clientChan,
                 this);
 
-        connections.connect(connectionId, handler); //
+        connections.connect(connectionId, handler); ///
 
         clientChan.register(selector, SelectionKey.OP_READ, handler);
     }
