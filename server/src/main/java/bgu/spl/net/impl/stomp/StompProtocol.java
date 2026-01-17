@@ -5,16 +5,9 @@ import bgu.spl.net.srv.Connections;
 
 public class StompProtocol implements StompMessagingProtocol<StompFrame> {
 
-    private boolean shouldTerminate;
-    private int connectionId;
+    private boolean shouldTerminate = false;
+    private int connectionId = -1;
     private Connections<StompFrame> connections;
-
-    public StompProtocol() {
-        shouldTerminate = false;
-        connectionId = -1;
-        connections = null;
-        
-    }
 
     @Override
     public void start(int connectionId, Connections<StompFrame> connections) {
@@ -26,13 +19,10 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
     public void process(StompFrame message) {
         if (message.getType() == FrameType.DISCONNECT) {
             shouldTerminate = true;
-
-
             //delete this line after testing    
             System.out.println("Connection " + connectionId + " disconnected.");
         }
         if (message.getType() == FrameType.SEND) {
-            // Broadcast the message to all subscribers
             connections.send(connectionId, message);
 
 
@@ -64,7 +54,9 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
         }
 
     }
-	
+
+
+
 	/**
      * @return true if the connection should be terminated
      */

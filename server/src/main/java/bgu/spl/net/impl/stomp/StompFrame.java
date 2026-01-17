@@ -68,7 +68,6 @@ public class StompFrame {
         return str;
     }
 
-
     public FrameType getType() {
         return type;
     }

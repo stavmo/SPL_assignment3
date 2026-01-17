@@ -6,18 +6,18 @@ import java.io.IOException;
 import java.net.Socket;
 
 import bgu.spl.net.api.MessageEncoderDecoder;
-import bgu.spl.net.api.MessagingProtocol;
+import bgu.spl.net.api.StompMessagingProtocol;
 
-public class BlockingConnectionHandler<StompFrame> implements Runnable, ConnectionHandler<StompFrame> {
+public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler<T> {
 
-    private final MessagingProtocol<StompFrame> protocol;
-    private final MessageEncoderDecoder<StompFrame> encdec;
+    private final StompMessagingProtocol<T> protocol;
+    private final MessageEncoderDecoder<T> encdec;
     private final Socket sock;
     private BufferedInputStream in;
     private BufferedOutputStream out;
     private volatile boolean connected = true;
 
-    public BlockingConnectionHandler(Socket sock, MessageEncoderDecoder<StompFrame> reader, MessagingProtocol<StompFrame> protocol) {
+    public BlockingConnectionHandler(Socket sock, MessageEncoderDecoder<T> reader, StompMessagingProtocol<T> protocol) {
         this.sock = sock;
         this.encdec = reader;
         this.protocol = protocol;
@@ -32,16 +32,11 @@ public class BlockingConnectionHandler<StompFrame> implements Runnable, Connecti
             out = new BufferedOutputStream(sock.getOutputStream());
 
             while (!protocol.shouldTerminate() && connected && (read = in.read()) >= 0) {
-                StompFrame nextMessage = encdec.decodeNextByte((byte) read);
+                T nextMessage = encdec.decodeNextByte((byte) read);
                 if (nextMessage != null) {
-                    StompFrame response = protocol.process(nextMessage);
-                    if (response != null) {
-                        out.write(encdec.encode(response));
-                        out.flush();
-                    }
+                    protocol.process(nextMessage);
                 }
             }
-
         } catch (IOException ex) {
             ex.printStackTrace();
         }
@@ -55,7 +50,16 @@ public class BlockingConnectionHandler<StompFrame> implements Runnable, Connecti
     }
 
     @Override
-    public void send(StompFrame msg) {
-        //IMPLEMENT IF NEEDED
+    public void send(T msg) {
+        if (msg != null) {
+            try {
+                out.write(encdec.encode(msg));
+                out.flush();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        
     }
+    
 }
