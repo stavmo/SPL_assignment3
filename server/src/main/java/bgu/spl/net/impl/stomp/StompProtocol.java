@@ -20,6 +20,8 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
         this.connections = connections; 
     }
     
+
+    //TODO: add ERROR frames for failures
     @Override
     public void process(StompFrame message) {
         if (message.getType() == FrameType.DISCONNECT) {
@@ -76,10 +78,14 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
         if (message.getType() == FrameType.UNSUBSCRIBE) {
             // Handle UNSUBSCRIBE frame
 
-            String dest = message.getHeaderValue ("destination");
-            String subscriberId = message.getHeaderValue ("id");
-            if(subscriberId.isEmpty())
+            String subId = message.getHeaderValue("id");
+            if (subId.isEmpty()) 
                 return;
+
+            String dest = connections.getDestinationBySubId(connectionId, subId);
+            if (dest.isEmpty()) 
+                return; // ADD ERROR HERE
+
             connections.unsubscribe(connectionId, dest);
 
             //delete this line after testing

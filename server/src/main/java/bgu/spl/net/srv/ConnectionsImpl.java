@@ -86,6 +86,8 @@ public class ConnectionsImpl<T> implements Connections<T> {
 
 
 
+
+    //HELPERS
     public ConcurrentHashMap<Integer, String> getSubscribers(String destination) {
         ConcurrentHashMap<Integer, String> m = channelSubscribers.get(destination);
         return (m == null) ? new ConcurrentHashMap<>() : m;
@@ -96,6 +98,18 @@ public class ConnectionsImpl<T> implements Connections<T> {
         if (my == null)
             return null;
         return my.get(destination);
+    }
+
+    public String getDestinationBySubId(int connectionId, String subId) {
+        ConcurrentHashMap<String, String> my = subscriptionsById.get(connectionId);
+        if (my == null) return null;
+
+        for (Map.Entry<String, String> e : my.entrySet()) {
+            if (subId.equals(e.getValue())) {
+                return e.getKey(); // destination
+            }
+        }
+        return null;
     }
 
 }

@@ -19,8 +19,9 @@ public interface Connections<T> {
     void unsubscribe(int connectionId, String channel);
 
     //helpers - TODO: need to check if it's okay
-
     public ConcurrentHashMap<Integer, String> getSubscribers(String destination);
     public String getSubscriptionId(int connectionId, String destination);
+    public String getDestinationBySubId(int connectionId, String subId);
+
 
 }
