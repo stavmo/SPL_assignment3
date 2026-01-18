@@ -14,6 +14,7 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
     private int connectionId = -1;
     private Connections<StompFrame> connections;
     private static final AtomicInteger MessageIdCounter = new AtomicInteger(0);
+    private boolean loggedIn = false;
 
 
 
@@ -27,18 +28,36 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
     //TODO: add ERROR frames for failures
     @Override
     public void process(StompFrame message) {
+        StompFrame.Header receiptHeader = message.getReceipt();
+        StompFrame receipt = null; 
+        if (receiptHeader != null) 
+            receipt = generateReceipt(receiptHeader);   
+
         if (message.getType() == FrameType.DISCONNECT) {
+            if (receiptHeader == null) {
+                terminate(null, "didn't provide receipt-id for DISCONNECT", "");
+            }
+
+            connections.send(connectionId,receipt);
+            connections.disconnect(connectionId);
+            loggedIn = false;
             shouldTerminate = true;
-            //delete this line after testing    
-            System.out.println("Connection " + connectionId + " disconnected.");
         }
+
         if (message.getType() == FrameType.SEND) { // we need to send MESSAGE to all of the subs in the channel
             String dest = message.getHeaderValue("destination");
-            if(dest == null || dest.isEmpty())
-                return;
+            if(dest == null || dest.isEmpty()) {
+                terminate(receiptHeader, "No destination provided", "");  
+                return; 
+            }
+                
             ConcurrentHashMap<Integer, String> subscribers = connections.getSubscribers(dest);
-            if(subscribers.isEmpty())
+
+            if(subscribers.isEmpty() || connections.getSubscriptionId(connectionId, dest) == null) {
+                terminate(receiptHeader, "THe user is nut subscribed to the channel", "");
                 return;
+            }
+                
 
             for(Integer connectionId : subscribers.keySet()){
                 String subscriberId = subscribers.get(connectionId);
@@ -53,13 +72,13 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
             connections.send(connectionId, frame);
             }
 
-
-            //delete this line after testing    
-            System.out.println("Connection " + connectionId + " sent a message.");
         }
         if (message.getType() == FrameType.CONNECT) {
-            // Handle CONNECT frame
-            //TODO!!!!!
+            if(loggedIn == true) {
+                connections.send(connectionId, generateError(receiptHeader, "”User already logged in”", ""));
+                return;
+            }
+
             String login = null;
             String passcode = null;
 
@@ -76,7 +95,6 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
                 }  
             }
 
-            StompFrame.Header receiptHeader = message.getReceipt();
             if (login == null || passcode == null) {
                 StompFrame error = generateError(receiptHeader,"CONNECT frane with no login or passcode","");
                 connections.disconnect(connectionId);
@@ -85,53 +103,48 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
             }
 
             if (connections.validateUser(login, passcode) < 0) {
-                StompFrame error = generateError(receiptHeader,"Wrong username or passcode, try again","");
+                StompFrame error = generateError(receiptHeader,"Wrong password","");
                 connections.disconnect(connectionId);
                 connections.send(connectionId, error);
                 return;
             }
+            loggedIn = true;
 
             Vector<StompFrame.Header> connectedHeaders = new Vector<>();
             connectedHeaders.add(new StompFrame.Header("version", "1.2"));
             connections.send(connectionId, new StompFrame(FrameType.CONNECTED, "", connectedHeaders));
-
-            if (receiptHeader != null) {
-                Vector<StompFrame.Header> receiptHeaders = new Vector<>();
-                receiptHeaders.add(receiptHeader);
-                connections.send(connectionId, new StompFrame(FrameType.RECEIPT, "", receiptHeaders));
-            }
         }
 
         if (message.getType() == FrameType.SUBSCRIBE) {
             // Handle SUBSCRIBE frame
-
             String dest = message.getHeaderValue ("destination");
             String subscriberId = message.getHeaderValue ("id");
-            if(dest == null || dest.isEmpty() || subscriberId == null || subscriberId.isEmpty())
+            if(dest == null || dest.isEmpty() || subscriberId == null || subscriberId.isEmpty()) {
+                terminate(receiptHeader, "Wrong format for SUBSCRIBE", "");
                 return;
+            }
+                
             connections.subscribe(connectionId, dest, subscriberId);
 
-            //delete this line after testing
-            System.out.println("Connection " + connectionId + " subscribed.");
 
         }
         if (message.getType() == FrameType.UNSUBSCRIBE) {
             // Handle UNSUBSCRIBE frame
-
             String subId = message.getHeaderValue("id");
             if (subId == null || subId.isEmpty()) 
                 return;
 
             String dest = connections.getDestinationBySubId(connectionId, subId);
-            if (dest == null || dest.isEmpty()) 
-                return; // ADD ERROR HERE
-
+            if (dest == null || dest.isEmpty()) {
+                terminate(receiptHeader, "Wrong format for UNSUBSCRIBE", "");
+                return;
+            }
             connections.unsubscribe(connectionId, dest);
-
-            //delete this line after testing
-            System.out.println("Connection " + connectionId + " unsubscribed.");
         }
 
+        if (receipt != null) {
+            connections.send(connectionId, receipt);
+        }
     }
 
 	/**
@@ -140,6 +153,13 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
     @Override
     public boolean shouldTerminate() {
         return shouldTerminate;
+    }
+
+    private void terminate(StompFrame.Header source, String message, String body) {
+        connections.send(connectionId, generateError(source, message, body));
+        connections.disconnect(connectionId);
+        shouldTerminate = true;
+        loggedIn = false;
     }
 
     private StompFrame generateReceipt(int id) {
