@@ -34,7 +34,7 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
         }
         if (message.getType() == FrameType.SEND) { // we need to send MESSAGE to all of the subs in the channel
             String dest = message.getHeaderValue("destination");
-            if(dest == "")
+            if(dest == null || dest.isEmpty())
                 return;
             ConcurrentHashMap<Integer, String> subscribers = connections.getSubscribers(dest);
             if(subscribers.isEmpty())
@@ -65,11 +65,11 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
 
             Vector<StompFrame.Header> headers = message.getHeaders();
             for (StompFrame.Header header : headers) {
-                if (header.getKey() == "login") {
+                if ("login".equals(header.getKey())) {
                     login = header.getValue();
                     if (passcode != null)
                         break;
-                } else if (header.getKey() == "passcode") {
+                } else if ("passcode".equals(header.getKey())) {
                     passcode = header.getValue();
                     if (login != null)
                         break;
@@ -84,7 +84,7 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
                 return;
             }
 
-            if (connections.validateUser(null, null) < 0) {
+            if (connections.validateUser(login, passcode) < 0) {
                 StompFrame error = generateError(receiptHeader,"Wrong username or passcode, try again","");
                 connections.disconnect(connectionId);
                 connections.send(connectionId, error);
@@ -97,7 +97,7 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
 
             if (receiptHeader != null) {
                 Vector<StompFrame.Header> receiptHeaders = new Vector<>();
-                connectedHeaders.add(receiptHeader);
+                receiptHeaders.add(receiptHeader);
                 connections.send(connectionId, new StompFrame(FrameType.RECEIPT, "", receiptHeaders));
             }
         }
@@ -107,7 +107,7 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
 
             String dest = message.getHeaderValue ("destination");
             String subscriberId = message.getHeaderValue ("id");
-            if(dest.isEmpty() | subscriberId.isEmpty())
+            if(dest == null || dest.isEmpty() || subscriberId == null || subscriberId.isEmpty())
                 return;
             connections.subscribe(connectionId, dest, subscriberId);
 
@@ -119,11 +119,11 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
             // Handle UNSUBSCRIBE frame
 
             String subId = message.getHeaderValue("id");
-            if (subId.isEmpty()) 
+            if (subId == null || subId.isEmpty()) 
                 return;
 
             String dest = connections.getDestinationBySubId(connectionId, subId);
-            if (dest.isEmpty()) 
+            if (dest == null || dest.isEmpty()) 
                 return; // ADD ERROR HERE
 
             connections.unsubscribe(connectionId, dest);
@@ -133,8 +133,6 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
         }
 
     }
-
-
 
 	/**
      * @return true if the connection should be terminated

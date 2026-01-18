@@ -1,37 +1,33 @@
 package bgu.spl.net.impl.stomp;
 
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
+
 import bgu.spl.net.api.MessageEncoderDecoder;
 
 public class StompEncDec implements MessageEncoderDecoder<StompFrame> {
 
-    public StompEncDec() {
+    private static final byte TERMINATOR = '\0';
+    private final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
 
-    }
-
-
-        /**
-     * add the next byte to the decoding process
-     *
-     * @param nextByte the next byte to consider for the currently decoded
-     * message
-     * @return a message if this byte completes one or null if it doesnt.
+    /**
+     * Accumulate bytes until the STOMP frame terminator (\0) is seen, then parse.
      */
     public StompFrame decodeNextByte(byte nextByte) {
-        return null; //place holder
+        if (nextByte == TERMINATOR) {
+            String raw = buffer.toString(StandardCharsets.UTF_8);
+            buffer.reset();
+            return new StompFrame(raw + "\0");
+        }
+
+        buffer.write(nextByte);
+        return null;
     }
 
     /**
-     * encodes the given message to bytes array
-     *
-     * @param message the message to encode
-     * @return the encoded bytes
+     * Encode a frame using UTF-8.
      */
     public byte[] encode(StompFrame message) {
-        return null; //place holder
+        return message.toString().getBytes(StandardCharsets.UTF_8);
     }
-
-
-
-
-    
 }

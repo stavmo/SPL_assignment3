@@ -126,9 +126,12 @@ public class ConnectionsImpl<T> implements Connections<T> {
         if (pass == null) {
             users.put(login, password);
             return 1;
-        } else if (pass == password) {
+        }
+
+        if (pass.equals(password)) {
             return 0;
         }
+
         return -1;
     }
     

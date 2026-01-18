@@ -23,7 +23,7 @@ public class StompFrame {
         this.body = body;
         this.headers = headers;
         for (Header header: headers) {
-            if (header.getKey() == "receipt-id") {
+            if ("receipt-id".equals(header.getKey())) {
                 hasReceipt = true;
             }
         }
