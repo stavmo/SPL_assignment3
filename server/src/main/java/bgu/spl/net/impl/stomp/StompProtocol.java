@@ -14,6 +14,8 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
     private Connections<StompFrame> connections;
     private static final AtomicInteger MessageIdCounter = new AtomicInteger(0);
 
+
+
     @Override
     public void start(int connectionId, Connections<StompFrame> connections) {
         this.connectionId = connectionId;
@@ -57,6 +59,8 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
         if (message.getType() == FrameType.CONNECT) {
             // Handle CONNECT frame
             //TODO!!!!!
+
+
 
             //delete this line after testing
             System.out.println("Connection " + connectionId + " connected.");
