@@ -9,4 +9,11 @@ public interface Connections<T> {
     void send(String channel, T msg);
 
     void disconnect(int connectionId);
+
+
+    //added these two methods to call them in process in StompProtocol 
+
+    void subscribe(int connectionId, String channel);
+
+    void unsubscribe(int connectionId, String channel);
 }

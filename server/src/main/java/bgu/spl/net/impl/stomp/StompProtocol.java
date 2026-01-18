@@ -39,7 +39,11 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
         }
         if (message.getType() == FrameType.SUBSCRIBE) {
             // Handle SUBSCRIBE frame
-            //TODO!!!!! 
+
+            String dest = message.getHeaderValue ("destination");
+            if(dest == null)
+                return;
+            connections.subscribe(connectionId, dest);
 
             //delete this line after testing
             System.out.println("Connection " + connectionId + " subscribed.");
@@ -47,7 +51,11 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
         }
         if (message.getType() == FrameType.UNSUBSCRIBE) {
             // Handle UNSUBSCRIBE frame
-            //TODO!!!!!
+
+            String dest = message.getHeaderValue ("destination");
+            if(dest == null)
+                return;
+            connections.unsubscribe(connectionId, dest);
 
             //delete this line after testing
             System.out.println("Connection " + connectionId + " unsubscribed.");
