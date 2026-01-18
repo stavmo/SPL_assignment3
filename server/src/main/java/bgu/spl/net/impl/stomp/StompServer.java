@@ -1,5 +1,9 @@
 package bgu.spl.net.impl.stomp;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
+import bgu.spl.net.srv.Connections;
+import bgu.spl.net.srv.ConnectionsImpl;
 import bgu.spl.net.srv.StompServerInter;
 
 
@@ -8,9 +12,6 @@ public class StompServer {
     public static void main(String[] args) {
         int port;
         String serverType;
-        int currentConnection;
-
-
         try {
             port = Integer.parseInt(args[0]);
             serverType = args[1];
@@ -26,6 +27,7 @@ public class StompServer {
                 port,
                 () -> new StompProtocol(), //protocol factory
                 () -> new StompEncDec()//message encoder decoder factory
+
         ).serve();
         }
 

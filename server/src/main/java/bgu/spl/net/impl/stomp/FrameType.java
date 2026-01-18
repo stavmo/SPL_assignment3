@@ -13,5 +13,6 @@ public enum FrameType {
     DISCONNECT,
     MESSAGE,
     RECEIPT,
-    ERROR
+    ERROR,
+    CONNECTED
 }

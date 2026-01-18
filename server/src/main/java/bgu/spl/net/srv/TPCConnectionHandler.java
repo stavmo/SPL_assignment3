@@ -17,11 +17,16 @@ public class TPCConnectionHandler<T> implements Runnable, ConnectionHandler<T> {
     private BufferedOutputStream out;
     private volatile boolean connected = true;
     private Connections<T> connections;
+    private int connectionID;
 
-    public TPCConnectionHandler(Socket sock, MessageEncoderDecoder<T> reader, StompMessagingProtocol<T> protocol) {
+
+    public TPCConnectionHandler(Socket sock, MessageEncoderDecoder<T> reader, StompMessagingProtocol<T> protocol,
+        Connections<T> connections, int connectionID) {
         this.sock = sock;
         this.encdec = reader;
         this.protocol = protocol;
+        this.connections = connections;
+        this.connectionID = connectionID;
     }
 
     @Override
@@ -31,6 +36,9 @@ public class TPCConnectionHandler<T> implements Runnable, ConnectionHandler<T> {
 
             in = new BufferedInputStream(sock.getInputStream());
             out = new BufferedOutputStream(sock.getOutputStream());
+
+            protocol.start(connectionID, connections);
+            connections.connect(connectionID, this);
 
             while (!protocol.shouldTerminate() && connected && (read = in.read()) >= 0) {
                 T nextMessage = encdec.decodeNextByte((byte) read);

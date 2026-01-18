@@ -15,12 +15,18 @@ public class StompFrame {
     final private FrameType type;
     final private Vector<Header> headers;
     final private String body; //can be an empty string can have content.
+    private boolean hasReceipt = false;
 
 
     public StompFrame(FrameType type, String body, Vector<Header> headers) {
         this.type = type;
         this.body = body;
         this.headers = headers;
+        for (Header header: headers) {
+            if (header.getKey() == "receipt-id") {
+                hasReceipt = true;
+            }
+        }
     }
 
 
@@ -78,6 +84,20 @@ public class StompFrame {
 
     public Vector<Header> getHeaders() {
         return headers;
+    }
+
+    public boolean hasReceipt() {
+        return hasReceipt;
+    }
+
+    public Header getReceipt() {
+        if (hasReceipt) {
+            for (Header header : headers) {
+                if (header.key.equals("receipt-id"))
+                    return header;
+            }
+        }
+        return null;
     }
 
     public String getHeaderValue(String key) {

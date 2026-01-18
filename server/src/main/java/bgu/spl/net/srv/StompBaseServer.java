@@ -3,6 +3,7 @@ package bgu.spl.net.srv;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 import bgu.spl.net.api.MessageEncoderDecoder;
@@ -15,6 +16,8 @@ public abstract class StompBaseServer<T> implements Server<T> {
     private final Supplier<StompMessagingProtocol<T>> protocolFactory;
     private final Supplier<MessageEncoderDecoder<T>> encdecFactory;
     private ServerSocket sock;
+    private AtomicInteger nextId = new AtomicInteger(0);
+    private Connections<T> connect = new ConnectionsImpl<>();
 
     public StompBaseServer(
             int port,
@@ -42,7 +45,9 @@ public abstract class StompBaseServer<T> implements Server<T> {
                 TPCConnectionHandler<T> handler = new TPCConnectionHandler<>(
                         clientSock,
                         encdecFactory.get(),
-                        protocolFactory.get());
+                        protocolFactory.get(),
+                        connect,
+                        nextId.incrementAndGet());
 
                 execute(handler);
             }

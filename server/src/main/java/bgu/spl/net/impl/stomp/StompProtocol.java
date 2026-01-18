@@ -60,18 +60,48 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
         if (message.getType() == FrameType.CONNECT) {
             // Handle CONNECT frame
             //TODO!!!!!
-            
+            String login = null;
+            String passcode = null;
 
+            Vector<StompFrame.Header> headers = message.getHeaders();
+            for (StompFrame.Header header : headers) {
+                if (header.getKey() == "login") {
+                    login = header.getValue();
+                    if (passcode != null)
+                        break;
+                } else if (header.getKey() == "passcode") {
+                    passcode = header.getValue();
+                    if (login != null)
+                        break;
+                }  
+            }
 
-            
+            StompFrame.Header receiptHeader = message.getReceipt();
+            if (login == null || passcode == null) {
+                StompFrame error = generateError(receiptHeader,"CONNECT frane with no login or passcode","");
+                connections.disconnect(connectionId);
+                connections.send(connectionId, error);
+                return;
+            }
 
+            if (connections.validateUser(null, null) < 0) {
+                StompFrame error = generateError(receiptHeader,"Wrong username or passcode, try again","");
+                connections.disconnect(connectionId);
+                connections.send(connectionId, error);
+                return;
+            }
 
+            Vector<StompFrame.Header> connectedHeaders = new Vector<>();
+            connectedHeaders.add(new StompFrame.Header("version", "1.2"));
+            connections.send(connectionId, new StompFrame(FrameType.CONNECTED, "", connectedHeaders));
 
-
-            //delete this line after testing
-            System.out.println("Connection " + connectionId + " connected.");
-
+            if (receiptHeader != null) {
+                Vector<StompFrame.Header> receiptHeaders = new Vector<>();
+                connectedHeaders.add(receiptHeader);
+                connections.send(connectionId, new StompFrame(FrameType.RECEIPT, "", receiptHeaders));
+            }
         }
+
         if (message.getType() == FrameType.SUBSCRIBE) {
             // Handle SUBSCRIBE frame
 
