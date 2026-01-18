@@ -12,6 +12,9 @@ public class StompServer {
     public static void main(String[] args) {
         int port;
         String serverType;
+        int currentConnection;
+
+
         try {
             port = Integer.parseInt(args[0]);
             serverType = args[1];

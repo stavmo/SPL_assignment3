@@ -15,9 +15,9 @@ public class StompEncDec implements MessageEncoderDecoder<StompFrame> {
      */
     public StompFrame decodeNextByte(byte nextByte) {
         if (nextByte == TERMINATOR) {
-            String raw = buffer.toString(StandardCharsets.UTF_8);
-            buffer.reset();
-            return new StompFrame(raw + "\0");
+         //   String raw = buffer.toString(StandardCharsets.UTF_8);
+         //   buffer.reset();
+         //   return new StompFrame(raw + "\0");
         }
 
         buffer.write(nextByte);
