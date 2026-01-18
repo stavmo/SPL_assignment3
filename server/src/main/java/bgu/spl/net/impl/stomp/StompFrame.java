@@ -14,7 +14,7 @@ import java.util.Vector;
 public class StompFrame {
     final private FrameType type;
     final private Vector<Header> headers;
-    final private String body;
+    final private String body; //can be an empty string can have content.
 
 
     public StompFrame(FrameType type, String body, Vector<Header> headers) {

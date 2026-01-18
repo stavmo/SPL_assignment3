@@ -107,4 +107,24 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
     public boolean shouldTerminate() {
         return shouldTerminate;
     }
+
+    private StompFrame generateReceipt() {
+        return null;
+
+    }
+
+    private StompFrame generateError(StompFrame.Header source, String message, String body) {
+        Vector<StompFrame.Header> headers = new Vector<>();
+        if (source != null) {
+            headers.add(source);
+        }
+        StompFrame.Header msgHeader = new StompFrame.Header("message", message);
+        headers.add(msgHeader);
+
+        if (body == null) {
+            body = "";
+        }
+        
+        return new StompFrame(FrameType.ERROR, body, headers);
+    }
 } 
