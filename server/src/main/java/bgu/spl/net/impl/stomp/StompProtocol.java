@@ -5,6 +5,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import bgu.spl.net.api.StompMessagingProtocol;
+import bgu.spl.net.srv.ConnectionHandler;
 import bgu.spl.net.srv.Connections;
 
 public class StompProtocol implements StompMessagingProtocol<StompFrame> {
@@ -59,6 +60,11 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
         if (message.getType() == FrameType.CONNECT) {
             // Handle CONNECT frame
             //TODO!!!!!
+            
+
+
+            
+
 
 
 
@@ -108,9 +114,17 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
         return shouldTerminate;
     }
 
-    private StompFrame generateReceipt() {
-        return null;
+    private StompFrame generateReceipt(int id) {
+        Vector<StompFrame.Header> headers = new Vector<StompFrame.Header>();
+        headers.add(new StompFrame.Header("Receipt-id", Integer.toString(id)));
 
+        return new StompFrame(FrameType.RECEIPT, "", headers);
+    }
+
+    private StompFrame generateReceipt(StompFrame.Header id) {
+        Vector<StompFrame.Header> headers = new Vector<StompFrame.Header>();
+        headers.add(id);
+        return new StompFrame(FrameType.RECEIPT, "", headers);
     }
 
     private StompFrame generateError(StompFrame.Header source, String message, String body) {
@@ -124,7 +138,7 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
         if (body == null) {
             body = "";
         }
-        
+
         return new StompFrame(FrameType.ERROR, body, headers);
     }
-} 
+}

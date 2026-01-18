@@ -5,6 +5,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class ConnectionsImpl<T> implements Connections<T> {
 
+    private final ConcurrentHashMap<String, String> users = new ConcurrentHashMap<>();
     
     private final ConcurrentHashMap<Integer, ConnectionHandler<T>> handlers = new ConcurrentHashMap<>();
 
@@ -111,6 +112,26 @@ public class ConnectionsImpl<T> implements Connections<T> {
         }
         return null;
     }
+
+    public ConnectionHandler<T> getHandlerByID(int connectionId) {
+        return handlers.get(connectionId);
+    }
+
+
+    //returns 0 if old user and right password.
+    //returns 1 if new user and adds the user to the dataBase
+    //returns -1 if wrong password,
+    public int validateUser(String login, String password) {
+        String pass = users.get(login);
+        if (pass == null) {
+            users.put(login, password);
+            return 1;
+        } else if (pass == password) {
+            return 0;
+        }
+        return -1;
+    }
+    
 
 }
 

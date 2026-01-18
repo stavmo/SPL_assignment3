@@ -8,7 +8,7 @@ public class StompServer {
     public static void main(String[] args) {
         int port;
         String serverType;
-        int currentConnection
+        int currentConnection;
 
 
         try {

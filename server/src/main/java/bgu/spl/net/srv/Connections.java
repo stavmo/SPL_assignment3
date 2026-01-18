@@ -22,6 +22,8 @@ public interface Connections<T> {
     public ConcurrentHashMap<Integer, String> getSubscribers(String destination);
     public String getSubscriptionId(int connectionId, String destination);
     public String getDestinationBySubId(int connectionId, String subId);
+    public ConnectionHandler<T> getHandlerByID(int connectionId);
+    public int validateUser(String login, String password);
 
 
 }
