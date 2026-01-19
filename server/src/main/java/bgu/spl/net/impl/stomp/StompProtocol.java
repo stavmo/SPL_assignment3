@@ -40,17 +40,16 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
         if (message.getType() == FrameType.DISCONNECT) {
             if (receiptHeader == null) {
                 terminate(null, "didn't provide receipt-id for DISCONNECT", "");
+                return;
             }
 
             database.logout(connectionId);
-            connections.send(connectionId,receipt);
+            connections.send(connectionId, receipt);
             connections.disconnect(connectionId);
             loggedIn = false;
             shouldTerminate = true;
-            return;
         }
-
-        if (message.getType() == FrameType.SEND) { // we need to send MESSAGE to all of the subs in the channel
+        else if (message.getType() == FrameType.SEND) { // we need to send MESSAGE to all of the subs in the channel
             String dest = message.getHeaderValue("destination");
             if(dest == null || dest.isEmpty()) {
                 terminate(receiptHeader, "No destination provided", "");  
@@ -60,33 +59,31 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
             ConcurrentHashMap<Integer, String> subscribers = connections.getSubscribers(dest);
 
             if(subscribers.isEmpty() || connections.getSubscriptionId(connectionId, dest) == null) {
-                terminate(receiptHeader, "THe user is nut subscribed to the channel", "");
+                terminate(receiptHeader, "The user is not subscribed to the channel", "");
                 return;
             }
                 
             MessageIdCounter.getAndIncrement();
 
-            for(Integer connectionId : subscribers.keySet()){
-                String subscriberId = subscribers.get(connectionId);
+            for(Integer clientId : subscribers.keySet()){
+                String subscriberId = subscribers.get(clientId);
 
                 Vector<StompFrame.Header> headers = new Vector<>();
                 headers.add(new StompFrame.Header("subscription", subscriberId));
                 headers.add(new StompFrame.Header("message-id", String.valueOf(MessageIdCounter)));
                 headers.add(new StompFrame.Header("destination", dest));
             
+                StompFrame frame = new StompFrame(FrameType.MESSAGE, message.getBody(), headers);
 
-            StompFrame frame = new StompFrame(FrameType.MESSAGE, message.getBody(), headers);
-
-            try {
-                connections.send(connectionId, frame);
-            } catch(Exception e) {
-                terminate(receiptHeader, "Couldn't send the message to one or more subscribers", "");
-                return;
+                try {
+                    connections.send(clientId, frame);
+                } catch(Exception e) {
+                    terminate(receiptHeader, "Couldn't send the message to one or more subscribers", "");
+                    return;
+                }
             }
         }
-
-        }
-        if (message.getType() == FrameType.CONNECT) {
+        else if (message.getType() == FrameType.CONNECT) {
 
             String login = message.getHeaderValue("login");
             String passcode = message.getHeaderValue("passcode");
@@ -121,14 +118,8 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
                     break;
             }
 
-                if(loggedIn == true) {
-                connections.send(connectionId, generateError(receiptHeader, "”User already logged in”", ""));
-                return;
-            }
-
         }
-
-        if (message.getType() == FrameType.SUBSCRIBE) {
+        else if (message.getType() == FrameType.SUBSCRIBE) {
             // Handle SUBSCRIBE frame
             String dest = message.getHeaderValue ("destination");
             String subscriberId = message.getHeaderValue ("id");
@@ -139,9 +130,8 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
                 
             connections.subscribe(connectionId, dest, subscriberId);
 
-
         }
-        if (message.getType() == FrameType.UNSUBSCRIBE) {
+        else if (message.getType() == FrameType.UNSUBSCRIBE) {
             // Handle UNSUBSCRIBE frame
             String subId = message.getHeaderValue("id");
             if (subId == null || subId.isEmpty()) 
@@ -155,6 +145,7 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
             connections.unsubscribe(connectionId, dest);
         }
 
+        // Send receipt at the end if one was requested and we didn't already send an error
         if (receipt != null) {
             connections.send(connectionId, receipt);
         }

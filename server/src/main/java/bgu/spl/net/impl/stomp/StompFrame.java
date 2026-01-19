@@ -58,6 +58,14 @@ public class StompFrame {
             bodyStr += "\n";
         }
         body = bodyStr;
+        
+        // Check if any header is receipt-id
+        for (Header header: headers) {
+            if ("receipt-id".equals(header.getKey())) {
+                hasReceipt = true;
+                break;
+            }
+        }
     }
 
     @Override
