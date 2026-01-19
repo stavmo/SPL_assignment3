@@ -173,12 +173,16 @@ int main(int argc, char *argv[]) {
 
         std::istringstream iss(line);
         std::string cmd;
-        iss >> cmd;
+
+        std::getline(iss, cmd, ' '); //start reading line, stop when you see a space, store that in "cmd"
 
         if (cmd == "login") {
             // login command = login {host:port} {user} {pass}
             std::string hostport, user, pass;
-            iss >> hostport >> user >> pass;
+            std::getline(iss, hostport, ' '); //start reading line, stop when you see a space, store that in "hostport"
+            std::getline(iss, user);  //store from there until the next space in "user"
+            std::getline(iss, pass);  //store from there the rest in "pass"
+
 
             size_t pos = hostport.find(':');
             if (pos == std::string::npos) {
@@ -229,7 +233,7 @@ int main(int argc, char *argv[]) {
 				continue; }
 
             std::string game;
-            iss >> game;
+            std::getline(iss, game, ' '); //start reading line, stop when you see a space, store that in "game"
             if (game.empty()) 
 				continue;
 
@@ -251,7 +255,7 @@ int main(int argc, char *argv[]) {
 				continue; }
 
             std::string game;
-            iss >> game;
+            std::getline(iss, game, ' '); //start reading line, stop when you see a space, store that in "game"
             if (game.empty()) 
 				continue;
 
@@ -278,7 +282,9 @@ int main(int argc, char *argv[]) {
 
             // report command looks like : {game} {jsonFile}
             std::string game, jsonFile;
-            iss >> game >> jsonFile;
+            std::getline(iss, game, ' '); //start reading line, stop when you see a space, store that in "game"
+            std::getline(iss, jsonFile);  //store from there the rest in "jsonFile"
+
             if (game.empty() || jsonFile.empty()) 
 				continue;
 
@@ -299,7 +305,10 @@ int main(int argc, char *argv[]) {
         else if (cmd == "summary") {
             // summary command looks like: summary{game} {user} {file}
             std::string game, user, outFile;
-            iss >> game >> user >> outFile;
+            std::getline(iss, game, ' '); //start reading line, stop when you see a space, store that in "game"
+            std::getline(iss, user);  //store from there until the next space in "user"
+            std::getline(iss, outFile);  //store from there the rest in "outFile"
+
             if (game.empty() || user.empty() || outFile.empty()) 
 				continue;
 
@@ -329,7 +338,7 @@ int main(int argc, char *argv[]) {
     StompFrame disc(FrameType::DISCONNECT, "", headers);
     sendFrame(*handler, disc);
 
-    // wait until server sends RECEIPT with matching receipt-id
+    // waits until server sends RECEIPT with matching receipt-id
     // we use unique_lock here because it lets the thread sleep without holding the lock, and then lock it again when it wakes up
     //main thread (keyboard) sleeps while waiting for the RECEIPT, listener thread gets the RECEIPT and updates receiptArrived, then wakes up main
     {
@@ -359,7 +368,7 @@ int main(int argc, char *argv[]) {
 }
 
     running = false;
-
+ 
     if (serverThread.joinable()) {
         serverThread.join();
     }

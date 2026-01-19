@@ -11,10 +11,8 @@ public class ConnectionsImpl<T> implements Connections<T> {
     
     private final ConcurrentHashMap<Integer, ConnectionHandler<T>> handlers = new ConcurrentHashMap<>();
 
-    //private final ConcurrentHashMap<String, Set<Integer>> channelSubscribers = new ConcurrentHashMap<>();
+    //this allows us to store subscription IDs with connectionID 
     private final ConcurrentHashMap<String, ConcurrentHashMap<Integer, String>> channelSubscribers = new ConcurrentHashMap<>();
-
-    //private final ConcurrentHashMap<Integer, Set<String>> subscriptionsById = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Integer, ConcurrentHashMap<String, String>> subscriptionsById = new ConcurrentHashMap<>();
 
     public void connect(int connectionId, ConnectionHandler<T> handler) {
@@ -35,7 +33,8 @@ public class ConnectionsImpl<T> implements Connections<T> {
     @Override
     public void send(String channel, T msg) {
         ConcurrentHashMap<Integer, String> subs = channelSubscribers.get(channel);
-        if (subs == null) return;
+        if (subs == null) 
+            return;
 
         // send to all the users that are currently subscribed
         for (Integer id : subs.keySet()) {
@@ -92,6 +91,7 @@ public class ConnectionsImpl<T> implements Connections<T> {
 
 
     //HELPERS
+    
     public ConcurrentHashMap<Integer, String> getSubscribers(String destination) {
         ConcurrentHashMap<Integer, String> m = channelSubscribers.get(destination);
         return (m == null) ? new ConcurrentHashMap<>() : m;
@@ -106,7 +106,8 @@ public class ConnectionsImpl<T> implements Connections<T> {
 
     public String getDestinationBySubId(int connectionId, String subId) {
         ConcurrentHashMap<String, String> my = subscriptionsById.get(connectionId);
-        if (my == null) return null;
+        if (my == null) 
+            return null;
 
         for (Map.Entry<String, String> e : my.entrySet()) {
             if (subId.equals(e.getValue())) {
