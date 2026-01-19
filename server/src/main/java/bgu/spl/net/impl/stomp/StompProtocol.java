@@ -5,10 +5,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import bgu.spl.net.api.StompMessagingProtocol;
-import bgu.spl.net.srv.ConnectionHandler;
-import bgu.spl.net.srv.Connections;
 import bgu.spl.net.impl.data.Database;
 import bgu.spl.net.impl.data.LoginStatus;
+import bgu.spl.net.srv.Connections;
 
 
 public class StompProtocol implements StompMessagingProtocol<StompFrame> {
@@ -44,16 +43,24 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
             }
 
             database.logout(connectionId);
+            connections.send(connectionId, receipt);
             connections.disconnect(connectionId);
             loggedIn = false;
             shouldTerminate = true;
+            return;
         }
         else if (message.getType() == FrameType.SEND) { // we need to send MESSAGE to all of the subs in the channel
+            if (!loggedIn) {
+                terminate(receiptHeader, "User is not logged in", "");
+                return;
+            }
+
             String dest = message.getHeaderValue("destination");
             if(dest == null || dest.isEmpty()) {
                 terminate(receiptHeader, "No destination provided", "");  
                 return; 
             }
+            
                 
             ConcurrentHashMap<Integer, String> subscribers = connections.getSubscribers(dest);
 
@@ -61,15 +68,25 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
                 terminate(receiptHeader, "The user is not subscribed to the channel", "");
                 return;
             }
+
+
+            String filename = message.getHeaderValue("filename");
+            if (filename == null || filename.isEmpty()) {
+                filename = "REPORT";
+            }
+
+            String gameChannel = dest.replaceFirst("^/topic/", "");
+
+            database.trackFileUpload(currentUser, filename, gameChannel);
                 
-            MessageIdCounter.getAndIncrement();
+            int msgId = MessageIdCounter.getAndIncrement();
 
             for(Integer clientId : subscribers.keySet()){
                 String subscriberId = subscribers.get(clientId);
 
                 Vector<StompFrame.Header> headers = new Vector<>();
                 headers.add(new StompFrame.Header("subscription", subscriberId));
-                headers.add(new StompFrame.Header("message-id", String.valueOf(MessageIdCounter)));
+                headers.add(new StompFrame.Header("message-id", String.valueOf(msgId)));
                 headers.add(new StompFrame.Header("destination", dest));
             
                 StompFrame frame = new StompFrame(FrameType.MESSAGE, message.getBody(), headers);
@@ -145,7 +162,7 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
         }
 
         // Send receipt at the end if one was requested and we didn't already send an error
-        if (receipt != null) {
+        if (!shouldTerminate && receipt != null) {
             connections.send(connectionId, receipt);
         }
     }

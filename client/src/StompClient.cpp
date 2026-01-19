@@ -304,6 +304,7 @@ int main(int argc, char *argv[]) {
 
                 std::vector<StompFrame::Header> headers;
                 headers.push_back({"destination", dest});
+                headers.push_back({"filename", jsonFile});
 
                 StompFrame sendF(FrameType::SEND, body, headers);
                 sendFrame(*handler, sendF);
