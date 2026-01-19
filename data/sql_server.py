@@ -11,6 +11,8 @@ the methods below.
 import socket
 import sys
 import threading
+import sqlite3
+from datetime import datetime
 
 
 SERVER_NAME = "STOMP_PYTHON_SQL_SERVER"  # DO NOT CHANGE!
@@ -30,15 +32,87 @@ def recv_null_terminated(sock: socket.socket) -> str:
 
 # TODO!!
 def init_database():
-    pass
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        # Create users table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                username TEXT PRIMARY KEY,
+                password TEXT NOT NULL,
+                registration_date TEXT NOT NULL
+            )
+        """)
+        
+        # Create login_history table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS login_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL,
+                login_time TEXT NOT NULL,
+                logout_time TEXT,
+                FOREIGN KEY (username) REFERENCES users(username)
+            )
+        """)
+        
+        # Create file_tracking table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS file_tracking (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                upload_time TEXT NOT NULL,
+                game_channel TEXT NOT NULL,
+                FOREIGN KEY (username) REFERENCES users(username)
+            )
+        """)
+        
+        conn.commit()
+        conn.close()
+        print(f"[{SERVER_NAME}] Database initialized successfully")
+        return "Database initialized"
+    except Exception as e:
+        print(f"[{SERVER_NAME}] Error initializing database: {e}")
+        return f"Error: {str(e)}"
 
 # TODO!!
 def execute_sql_command(sql_command: str) -> str:
-    return "done"
+    """Execute SQL commands like INSERT, UPDATE, DELETE, CREATE."""
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute(sql_command)
+        conn.commit()
+        rows_affected = cursor.rowcount
+        conn.close()
+        return f"done ({rows_affected} rows affected)"
+    except Exception as e:
+        return f"Error: {str(e)}"
 
-#TODO!!
+# TODO!!
 def execute_sql_query(sql_query: str) -> str:
-    return "done"
+    """Execute SQL SELECT queries and return results."""
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute(sql_query)
+        rows = cursor.fetchall()
+        column_names = [description[0] for description in cursor.description]
+        conn.close()
+        
+        if not rows:
+            return "No results found"
+        
+        # Format results as table
+        result = " | ".join(column_names) + "\n"
+        result += "-" * (len(result) - 1) + "\n"
+        for row in rows:
+            result += " | ".join(str(item) if item is not None else "NULL" for item in row) + "\n"
+        
+        return result.strip()
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 
 def handle_client(client_socket: socket.socket, addr):
@@ -53,7 +127,15 @@ def handle_client(client_socket: socket.socket, addr):
             print(f"[{SERVER_NAME}] Received:")
             print(message)
 
-            client_socket.sendall(b"done\0")
+            # Determine if it's a query or command
+            message_upper = message.strip().upper()
+            
+            if message_upper.startswith("SELECT"):
+                result = execute_sql_query(message)
+            else:
+                result = execute_sql_command(message)
+            
+            client_socket.sendall((result + "\0").encode("utf-8"))
 
     except Exception as e:
         print(f"[{SERVER_NAME}] Error handling client {addr}: {e}")
@@ -66,6 +148,9 @@ def handle_client(client_socket: socket.socket, addr):
 
 
 def start_server(host="127.0.0.1", port=7778):
+    # Initialize database on startup
+    init_database()
+    
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
