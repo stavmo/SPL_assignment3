@@ -30,15 +30,19 @@ public class StompServer {
                 port,
                 () -> new StompProtocol(), //protocol factory
                 () -> new StompEncDec()//message encoder decoder factory
-
         ).serve();
         }
 
-        // Server.reactor(
-        //         Runtime.getRuntime().availableProcessors(),
-        //         7777, //port
-        //         () -> new EchoProtocol<>(), //protocol factory
-        //         LineMessageEncoderDecoder::new //message encoder decoder factory
-        // ).serve();
+        else{
+            StompServerInter.reactor(
+            Runtime.getRuntime().availableProcessors(),
+            port, 
+            () -> new StompProtocol(), //protocol factory
+            () -> new StompEncDec()
+        ).serve();
+
+        }
+
+
     }
 }

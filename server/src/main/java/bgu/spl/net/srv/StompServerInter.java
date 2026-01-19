@@ -49,12 +49,12 @@ public interface StompServerInter<T> extends Closeable {
 
     //this part doesnt support stomp yet :(
 
-    // public static <T> Server<T> reactor(
-    //         int nthreads,
-    //         int port,
-    //         Supplier<StompMessagingProtocol<T>> protocolFactory,
-    //         Supplier<MessageEncoderDecoder<T>> encoderDecoderFactory) {
-    //     return new Reactor<T>(nthreads, port, protocolFactory, encoderDecoderFactory);
-    // }
+    public static <T> Server<T> reactor(
+            int nthreads,
+            int port,
+            Supplier<StompMessagingProtocol<T>> protocolFactory,
+            Supplier<MessageEncoderDecoder<T>> encoderDecoderFactory) {
+        return new Reactor<T>(nthreads, port, protocolFactory, encoderDecoderFactory);
+    }
 
 }
