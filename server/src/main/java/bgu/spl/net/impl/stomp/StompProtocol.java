@@ -44,7 +44,6 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
             }
 
             database.logout(connectionId);
-            connections.send(connectionId, receipt);
             connections.disconnect(connectionId);
             loggedIn = false;
             shouldTerminate = true;
