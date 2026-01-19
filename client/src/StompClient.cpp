@@ -178,6 +178,11 @@ int main(int argc, char *argv[]) {
 
         if (cmd == "login") {
             // login command = login {host:port} {user} {pass}
+            if (handler != nullptr) {
+                std::cerr << "The client is already logged in, log out before trying again\n";
+                continue;
+            }
+
             std::string hostport, user, pass;
             std::getline(iss, hostport, ' '); //start reading line, stop when you see a space, store that in "hostport"
             std::getline(iss, user);  //store from there until the next space in "user"
@@ -233,7 +238,7 @@ int main(int argc, char *argv[]) {
 				continue; }
 
             std::string game;
-            std::getline(iss, game, ' '); //start reading line, stop when you see a space, store that in "game"
+            std::getline(iss, game); //start reading line, store that in "game"
             if (game.empty()) 
 				continue;
 
@@ -248,6 +253,7 @@ int main(int argc, char *argv[]) {
 
             StompFrame subFrame(FrameType::SUBSCRIBE, "", headers);
             sendFrame(*handler, subFrame);
+            std::cout << "Joined channel " << game << "\n";
         }
 
         else if (cmd == "exit") {
@@ -255,7 +261,7 @@ int main(int argc, char *argv[]) {
 				continue; }
 
             std::string game;
-            std::getline(iss, game, ' '); //start reading line, stop when you see a space, store that in "game"
+            std::getline(iss, game); //start reading line, store that in "game"
             if (game.empty()) 
 				continue;
 
@@ -274,22 +280,24 @@ int main(int argc, char *argv[]) {
             sendFrame(*handler, unsub);
 
             gameToSubId.erase(it);
+            std::cout << "Exited channel " << game << "\n";
         }
 
         else if (cmd == "report") {
             if (handler == nullptr) { std::cerr << "login first\n"; 
 				continue; }
 
-            // report command looks like : {game} {jsonFile}
-            std::string game, jsonFile;
-            std::getline(iss, game, ' '); //start reading line, stop when you see a space, store that in "game"
+            // report command looks like : {file}
+            std::string jsonFile;
             std::getline(iss, jsonFile);  //store from there the rest in "jsonFile"
 
-            if (game.empty() || jsonFile.empty()) 
+            if (jsonFile.empty()) 
 				continue;
 
             names_and_events parsed = parseEventsFile(jsonFile);
-            std::string dest = "/topic/" + game;
+            // The game name is derived from team names: "team_a_name<team_b_name"
+            std::string gameName = parsed.team_a_name + "<" + parsed.team_b_name + ">";
+            std::string dest = "/topic/" + gameName;
 
             for (const Event& ev : parsed.events) {
                 std::string body = buildEventBody(ev, activeUser);
@@ -300,6 +308,7 @@ int main(int argc, char *argv[]) {
                 StompFrame sendF(FrameType::SEND, body, headers);
                 sendFrame(*handler, sendF);
             }
+            std::cout << "Sent reports to " << gameName << " game\n";
         }
 
         else if (cmd == "summary") {
@@ -354,6 +363,7 @@ int main(int argc, char *argv[]) {
         handler->close();
         delete handler;
         handler = nullptr;
+        std::cout << "Disconnected\n";
     }
 
     // graceful shut down
