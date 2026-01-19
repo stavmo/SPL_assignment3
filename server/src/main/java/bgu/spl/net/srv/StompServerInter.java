@@ -45,10 +45,6 @@ public interface StompServerInter<T> extends Closeable {
      * @return A new reactor server
      */
 
-    
-
-    //this part doesnt support stomp yet :(
-
     public static <T> Server<T> reactor(
             int nthreads,
             int port,
