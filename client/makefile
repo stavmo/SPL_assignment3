@@ -1,13 +1,13 @@
 CFLAGS:=-c -Wall -Weffc++ -g -std=c++11 -Iinclude
 LDFLAGS:=-lboost_system -lpthread -lstdc++ -lgcc_s
 
-all: EchoClient
+all: StompClient
 
 EchoClient: bin/ConnectionHandler.o bin/echoClient.o
 	g++ -o bin/EchoClient bin/ConnectionHandler.o bin/echoClient.o $(LDFLAGS)
 
-StompWCIClient: bin/ConnectionHandler.o bin/StompClient.o bin/event.o bin/StompFrame.o bin/GameDB.o
-	g++ -o bin/StompWCIClient bin/ConnectionHandler.o bin/StompClient.o bin/event.o bin/StompFrame.o bin/GameDB.o $(LDFLAGS)
+StompClient: bin/ConnectionHandler.o bin/StompClient.o bin/event.o bin/StompFrame.o bin/GameDB.o
+	g++ -o bin/StompClient bin/ConnectionHandler.o bin/StompClient.o bin/event.o bin/StompFrame.o bin/GameDB.o $(LDFLAGS)
 
 bin/ConnectionHandler.o: src/ConnectionHandler.cpp
 	g++ $(CFLAGS) -o bin/ConnectionHandler.o src/ConnectionHandler.cpp
