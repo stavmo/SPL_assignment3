@@ -126,9 +126,10 @@ static void listenToServer(ConnectionHandler& handler,
         else if (frame.getType() == FrameType::RECEIPT) {
             std::string receiptId = frame.getHeaderValue("receipt-id");
             if (receiptId == expectedReceiptId) {
-                std::lock_guard<std::mutex> lock(receiptMtx);
+                receiptMtx.lock();
                 receiptArrived = true;
                 receiptCv.notify_all();
+                receiptMtx.unlock();
             }
         }
         else if (frame.getType() == FrameType::ERROR) {
@@ -315,9 +316,10 @@ int main(int argc, char *argv[]) {
 
     // reset receipt
     {
-        std::lock_guard<std::mutex> lock(receiptMtx);
+        receiptMtx.lock();
         receiptArrived = false;
         expectedReceiptId = std::to_string(nextReceiptId++);
+        receiptMtx.unlock();
     }
 
     // send DISCONNECT with receipt header
@@ -328,9 +330,14 @@ int main(int argc, char *argv[]) {
     sendFrame(*handler, disc);
 
     // wait until server sends RECEIPT with matching receipt-id
+    // we use unique_lock here because it lets the thread sleep without holding the lock, and then lock it again when it wakes up
+    //main thread (keyboard) sleeps while waiting for the RECEIPT, listener thread gets the RECEIPT and updates receiptArrived, then wakes up main
     {
         std::unique_lock<std::mutex> lock(receiptMtx);
-        receiptCv.wait(lock, [&](){ return receiptArrived; });
+
+        while (!receiptArrived) {
+            receiptCv.wait(lock);
+        }
     }
 
     // close socket after we get RECEIPT
