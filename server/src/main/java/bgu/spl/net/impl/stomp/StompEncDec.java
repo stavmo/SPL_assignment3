@@ -20,7 +20,7 @@ public class StompEncDec implements MessageEncoderDecoder<StompFrame> {
         if (nextByte == TERMINATOR) {
            return popFrame();
         }
-        
+
         pushByte(nextByte);
         return null;
     }
@@ -29,7 +29,7 @@ public class StompEncDec implements MessageEncoderDecoder<StompFrame> {
      * Encode a frame using UTF-8.
      */
     public byte[] encode(StompFrame message) {
-        return message.toString().getBytes(StandardCharsets.UTF_8);
+        return message.toString().getBytes();
     }
 
     private void pushByte(byte nextByte) {
