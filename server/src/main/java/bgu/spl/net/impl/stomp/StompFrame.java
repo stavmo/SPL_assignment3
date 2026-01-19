@@ -14,7 +14,7 @@ import java.util.Vector;
 public class StompFrame {
     final private FrameType type;
     final private Vector<Header> headers;
-    final private String body; //can be an empty string can have content.
+    final private String body; //can be an empty string or can have content.
     private boolean hasReceipt = false;
 
 
@@ -125,6 +125,9 @@ public class StompFrame {
             return value;
         }
     }
-    
+
+    public void addHeader(Header h) {
+        headers.add(h);
+    }
     
 }

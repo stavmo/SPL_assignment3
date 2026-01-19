@@ -3,6 +3,8 @@ package bgu.spl.net.srv;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import bgu.spl.net.impl.stomp.StompFrame;
+
 public class ConnectionsImpl<T> implements Connections<T> {
 
     private final ConcurrentHashMap<String, String> users = new ConcurrentHashMap<>();
@@ -37,6 +39,7 @@ public class ConnectionsImpl<T> implements Connections<T> {
 
         // send to all the users that are currently subscribed
         for (Integer id : subs.keySet()) {
+
             send(id, msg);
         }
     }
@@ -134,7 +137,5 @@ public class ConnectionsImpl<T> implements Connections<T> {
 
         return -1;
     }
-    
-
 }
 

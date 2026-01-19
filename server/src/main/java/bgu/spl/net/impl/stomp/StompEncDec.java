@@ -1,6 +1,5 @@
 package bgu.spl.net.impl.stomp;
 
-import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 

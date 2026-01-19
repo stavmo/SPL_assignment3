@@ -25,7 +25,6 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
     }
     
 
-    //TODO: add ERROR frames for failures
     @Override
     public void process(StompFrame message) {
         StompFrame.Header receiptHeader = message.getReceipt();
@@ -58,19 +57,26 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
                 return;
             }
                 
+            MessageIdCounter.getAndIncrement();
 
             for(Integer connectionId : subscribers.keySet()){
                 String subscriberId = subscribers.get(connectionId);
 
                 Vector<StompFrame.Header> headers = new Vector<>();
                 headers.add(new StompFrame.Header("subscription", subscriberId));
-                headers.add(new StompFrame.Header("message-id", String.valueOf(MessageIdCounter.getAndIncrement())));
+                headers.add(new StompFrame.Header("message-id", String.valueOf(MessageIdCounter)));
                 headers.add(new StompFrame.Header("destination", dest));
             
 
             StompFrame frame = new StompFrame(FrameType.MESSAGE, message.getBody(), headers);
-            connections.send(connectionId, frame);
+
+            try {
+                connections.send(connectionId, frame);
+            } catch(Exception e) {
+                terminate(receiptHeader, "Couldn't send the message to one or more subscribers", "");
+                return;
             }
+        }
 
         }
         if (message.getType() == FrameType.CONNECT) {
@@ -189,4 +195,5 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
 
         return new StompFrame(FrameType.ERROR, body, headers);
     }
+
 }

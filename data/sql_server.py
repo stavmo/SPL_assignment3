@@ -28,15 +28,15 @@ def recv_null_terminated(sock: socket.socket) -> str:
             msg, _ = data.split(b"\0", 1)
             return msg.decode("utf-8", errors="replace")
 
-
+# TODO!!
 def init_database():
     pass
 
-
+# TODO!!
 def execute_sql_command(sql_command: str) -> str:
     return "done"
 
-
+#TODO!!
 def execute_sql_query(sql_query: str) -> str:
     return "done"
 
