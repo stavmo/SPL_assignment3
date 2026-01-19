@@ -7,6 +7,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import bgu.spl.net.api.StompMessagingProtocol;
 import bgu.spl.net.srv.ConnectionHandler;
 import bgu.spl.net.srv.Connections;
+import bgu.spl.net.impl.data.Database;
+import bgu.spl.net.impl.data.LoginStatus;
+
 
 public class StompProtocol implements StompMessagingProtocol<StompFrame> {
 
@@ -15,6 +18,8 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
     private Connections<StompFrame> connections;
     private static final AtomicInteger MessageIdCounter = new AtomicInteger(0);
     private boolean loggedIn = false;
+    private final Database database = Database.getInstance();
+    private String currentUser = null;
 
 
 
@@ -37,10 +42,12 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
                 terminate(null, "didn't provide receipt-id for DISCONNECT", "");
             }
 
+            database.logout(connectionId);
             connections.send(connectionId,receipt);
             connections.disconnect(connectionId);
             loggedIn = false;
             shouldTerminate = true;
+            return;
         }
 
         if (message.getType() == FrameType.SEND) { // we need to send MESSAGE to all of the subs in the channel
@@ -80,45 +87,45 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
 
         }
         if (message.getType() == FrameType.CONNECT) {
-            if(loggedIn == true) {
+
+            String login = message.getHeaderValue("login");
+            String passcode = message.getHeaderValue("passcode");
+
+            LoginStatus status = database.login(connectionId, login, passcode);
+
+            switch (status) {
+                case CLIENT_ALREADY_CONNECTED:
+                    connections.send(connectionId,
+                        generateError(receiptHeader, "Client already connected", ""));
+                    return;
+
+                case WRONG_PASSWORD:
+                    connections.send(connectionId,
+                        generateError(receiptHeader, "Wrong password", ""));
+                    return;
+
+                case ALREADY_LOGGED_IN:
+                    connections.send(connectionId,
+                        generateError(receiptHeader, "User already logged in", ""));
+                    return;
+
+                case ADDED_NEW_USER:
+                case LOGGED_IN_SUCCESSFULLY:
+                    loggedIn = true;
+                    currentUser = login;
+
+                    Vector<StompFrame.Header> headers = new Vector<>();
+                    headers.add(new StompFrame.Header("version", "1.2"));
+
+                    connections.send(connectionId, new StompFrame(FrameType.CONNECTED, "", headers));
+                    break;
+            }
+
+                if(loggedIn == true) {
                 connections.send(connectionId, generateError(receiptHeader, "”User already logged in”", ""));
                 return;
             }
 
-            String login = null;
-            String passcode = null;
-
-            Vector<StompFrame.Header> headers = message.getHeaders();
-            for (StompFrame.Header header : headers) {
-                if ("login".equals(header.getKey())) {
-                    login = header.getValue();
-                    if (passcode != null)
-                        break;
-                } else if ("passcode".equals(header.getKey())) {
-                    passcode = header.getValue();
-                    if (login != null)
-                        break;
-                }  
-            }
-
-            if (login == null || passcode == null) {
-                StompFrame error = generateError(receiptHeader,"CONNECT frane with no login or passcode","");
-                connections.disconnect(connectionId);
-                connections.send(connectionId, error);
-                return;
-            }
-
-            if (connections.validateUser(login, passcode) < 0) {
-                StompFrame error = generateError(receiptHeader,"Wrong password","");
-                connections.disconnect(connectionId);
-                connections.send(connectionId, error);
-                return;
-            }
-            loggedIn = true;
-
-            Vector<StompFrame.Header> connectedHeaders = new Vector<>();
-            connectedHeaders.add(new StompFrame.Header("version", "1.2"));
-            connections.send(connectionId, new StompFrame(FrameType.CONNECTED, "", connectedHeaders));
         }
 
         if (message.getType() == FrameType.SUBSCRIBE) {
