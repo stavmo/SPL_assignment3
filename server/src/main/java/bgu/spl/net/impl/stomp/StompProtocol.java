@@ -44,7 +44,7 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
 
             database.logout(connectionId);
             connections.send(connectionId, receipt);
-            connections.disconnect(connectionId);
+            //connections.disconnect(connectionId);
             loggedIn = false;
             shouldTerminate = true;
             return;
@@ -104,22 +104,28 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
             String login = message.getHeaderValue("login");
             String passcode = message.getHeaderValue("passcode");
 
+            if (login == null || passcode == null) {
+                connections.send(connectionId,
+                    generateError(null, "Missing login or passcode", ""));
+                return;
+            }
+
             LoginStatus status = database.login(connectionId, login, passcode);
 
             switch (status) {
                 case CLIENT_ALREADY_CONNECTED:
                     connections.send(connectionId,
-                        generateError(receiptHeader, "Client already connected", ""));
+                        generateError(null, "Client already connected", ""));
                     return;
 
                 case WRONG_PASSWORD:
                     connections.send(connectionId,
-                        generateError(receiptHeader, "Wrong password", ""));
+                        generateError(null, "Wrong password", ""));
                     return;
 
                 case ALREADY_LOGGED_IN:
                     connections.send(connectionId,
-                        generateError(receiptHeader, "User already logged in", ""));
+                        generateError(null, "User already logged in", ""));
                     return;
 
                 case ADDED_NEW_USER:
@@ -131,7 +137,7 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
                     headers.add(new StompFrame.Header("version", "1.2"));
 
                     connections.send(connectionId, new StompFrame(FrameType.CONNECTED, "", headers));
-                    break;
+                return;
             }
 
         }
@@ -184,7 +190,7 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
 
     private StompFrame generateReceipt(int id) {
         Vector<StompFrame.Header> headers = new Vector<StompFrame.Header>();
-        headers.add(new StompFrame.Header("Receipt-id", Integer.toString(id)));
+        headers.add(new StompFrame.Header("receipt-id", Integer.toString(id)));
 
         return new StompFrame(FrameType.RECEIPT, "", headers);
     }

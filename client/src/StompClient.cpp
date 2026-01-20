@@ -91,7 +91,7 @@ static void listenToServer(ConnectionHandler& handler,
     while (running) {
         std::string raw_str;
         if (!handler.getFrameAscii(raw_str, '\0')) {
-            running = false;
+            //running = false;
             break;
         }
 
@@ -132,8 +132,13 @@ static void listenToServer(ConnectionHandler& handler,
                 receiptMtx.unlock();
             }
         }
-        else if (frame.getType() == FrameType::ERROR) {
+        /* else if (frame.getType() == FrameType::ERROR) {
             std::cerr << "ERROR from server:\n" << frame.getBody() << std::endl;
+        } */
+        else if (frame.getType() == FrameType::ERROR) {
+            if (!shouldTerminate) {
+                std::cerr << "ERROR from server:\n" << frame.getBody() << std::endl;
+            }
         }
 
         if (shouldTerminate) {
@@ -185,7 +190,7 @@ int main(int argc, char *argv[]) {
 
             std::string hostport, user, pass;
             std::getline(iss, hostport, ' '); //start reading line, stop when you see a space, store that in "hostport"
-            std::getline(iss, user);  //store from there until the next space in "user"
+            std::getline(iss, user, ' ');  //store from there until the next space in "user"
             std::getline(iss, pass);  //store from there the rest in "pass"
 
 
@@ -295,8 +300,10 @@ int main(int argc, char *argv[]) {
 				continue;
 
             names_and_events parsed = parseEventsFile(jsonFile);
-            // The game name is derived from team names: "team_a_name<team_b_name"
-            std::string gameName = parsed.team_a_name + "<" + parsed.team_b_name + ">";
+            // Use the same game name the user joined
+            // Assume user joined with team_a_team_b format
+            std::string gameName =
+                parsed.team_a_name + "_" + parsed.team_b_name;
             std::string dest = "/topic/" + gameName;
 
             for (const Event& ev : parsed.events) {
@@ -309,6 +316,8 @@ int main(int argc, char *argv[]) {
                 StompFrame sendF(FrameType::SEND, body, headers);
                 sendFrame(*handler, sendF);
             }
+
+            std::cout << "DEBUG SEND destination = " << dest << std::endl;
             std::cout << "Sent reports to " << gameName << " game\n";
         }
 
@@ -316,7 +325,7 @@ int main(int argc, char *argv[]) {
             // summary command looks like: summary{game} {user} {file}
             std::string game, user, outFile;
             std::getline(iss, game, ' '); //start reading line, stop when you see a space, store that in "game"
-            std::getline(iss, user);  //store from there until the next space in "user"
+            std::getline(iss, user, ' ');  //store from there until the next space in "user"
             std::getline(iss, outFile);  //store from there the rest in "outFile"
 
             if (game.empty() || user.empty() || outFile.empty()) 
@@ -333,45 +342,45 @@ int main(int argc, char *argv[]) {
             if (handler == nullptr) 
 				break;
 
-    // reset receipt
-    {
-        receiptMtx.lock();
-        receiptArrived = false;
-        expectedReceiptId = std::to_string(nextReceiptId++);
-        receiptMtx.unlock();
-    }
+        // reset receipt
+        
+            receiptMtx.lock();
+            receiptArrived = false;
+            expectedReceiptId = std::to_string(nextReceiptId++);
+            receiptMtx.unlock();
+        
 
-    // send DISCONNECT with receipt header
-    std::vector<StompFrame::Header> headers;
-    headers.push_back({"receipt", expectedReceiptId});
+            // send DISCONNECT with receipt header
+            std::vector<StompFrame::Header> headers;
+            headers.push_back({"receipt", expectedReceiptId});
 
-    StompFrame disc(FrameType::DISCONNECT, "", headers);
-    sendFrame(*handler, disc);
+            StompFrame disc(FrameType::DISCONNECT, "", headers);
+            sendFrame(*handler, disc);
 
-    // waits until server sends RECEIPT with matching receipt-id
-    // we use unique_lock here because it lets the thread sleep without holding the lock, and then lock it again when it wakes up
-    //main thread (keyboard) sleeps while waiting for the RECEIPT, listener thread gets the RECEIPT and updates receiptArrived, then wakes up main
-    {
-        std::unique_lock<std::mutex> lock(receiptMtx);
+            // waits until server sends RECEIPT with matching receipt-id
+            // we use unique_lock here because it lets the thread sleep without holding the lock, and then lock it again when it wakes up
+            //main thread (keyboard) sleeps while waiting for the RECEIPT, listener thread gets the RECEIPT and updates receiptArrived, then wakes up main
+            {
+                std::unique_lock<std::mutex> lock(receiptMtx);
 
-        while (!receiptArrived) {
-            receiptCv.wait(lock);
+                while (!receiptArrived) {
+                    receiptCv.wait(lock);
+                }
+            }
+
+            // graceful shut down
+            shouldTerminate = true;
+            running = false;
+            break;
+
+            // close socket after we get RECEIPT
+            if (handler != nullptr) {
+                handler->close();
+                delete handler;
+                handler = nullptr;
+                std::cout << "Disconnected\n";
+            }
         }
-    }
-
-    // close socket after we get RECEIPT
-    if (handler != nullptr) {
-        handler->close();
-        delete handler;
-        handler = nullptr;
-        std::cout << "Disconnected\n";
-    }
-
-    // graceful shut down
-    shouldTerminate = true;
-    running = false;
-    break;
-    }
 
 	else {
 		std::cerr << "unknown command: " << cmd << "\n";
