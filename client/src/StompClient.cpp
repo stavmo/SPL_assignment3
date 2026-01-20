@@ -89,7 +89,11 @@ static void listenToServer(ConnectionHandler& handler,
 						   std::string& expectedReceiptId,
                            bool& receiptArrived,
                            std::mutex& receiptMtx,
-                           std::condition_variable& receiptCv)
+                           std::condition_variable& receiptCv,
+                           std::mutex& loginMtx,
+                           std::condition_variable& loginCv,
+                           std::string& loginError,
+                           bool& loginResponseReceived)
 {
     while (running && !shouldTerminate) {
         std::string raw_str;
@@ -161,20 +165,41 @@ static void listenToServer(ConnectionHandler& handler,
             }
         }
         
-        /* else if (frame.getType() == FrameType::ERROR) {
-            std::cerr << "ERROR from server:\n" << frame.getBody() << std::endl;
-        } */
-        else if (frame.getType() == FrameType::ERROR) {
-            if (!disconnecting.load()) {
-                std::cerr << "ERROR from server:\n" << frame.getBody() << std::endl;
+        else if (frame.getType() == FrameType::CONNECTED) {
+            std::cout << "Login successful" << std::endl;
+            {
+                std::lock_guard<std::mutex> lock(loginMtx);
+                loginResponseReceived = true;
+                loginError = "";
             }
-            break;
+            loginCv.notify_all();
         }
-
-        /* if (shouldTerminate) {
+        else if (frame.getType() == FrameType::ERROR) {
+            std::string errorBody = frame.getBody();
+            std::string errorMsg = frame.getHeaderValue("message");
+            
+            if (errorMsg.find("User already logged in") != std::string::npos) {
+                std::cerr << "User already logged in" << std::endl;
+            }
+            else if (errorMsg.find("Wrong password") != std::string::npos) {
+                std::cerr << "Wrong password" << std::endl;
+            }
+            else if (!errorMsg.empty()) {
+                std::cerr << errorMsg << std::endl;
+            }
+            else if (!errorBody.empty()) {
+                std::cerr << errorBody << std::endl;
+            }
+            
+            {
+                std::lock_guard<std::mutex> lock(loginMtx);
+                loginResponseReceived = true;
+                loginError = errorMsg.empty() ? errorBody : errorMsg;
+            }
+            loginCv.notify_all();
             running = false;
             break;
-        } */
+        }
     }
 }
 
@@ -193,11 +218,16 @@ int main(int argc, char *argv[]) {
     ConnectionHandler* handler = nullptr;
     std::thread serverThread;
 
-	std::mutex receiptMtx;
-	std::condition_variable receiptCv;
-	bool receiptArrived = false;
-	std::string expectedReceiptId = "";
-	int nextReceiptId = 1;
+    std::mutex receiptMtx;
+    std::condition_variable receiptCv;
+    bool receiptArrived = false;
+    std::string expectedReceiptId = "";
+    int nextReceiptId = 1;
+
+    std::mutex loginMtx;
+    std::condition_variable loginCv;
+    std::string loginError = "";
+    bool loginResponseReceived = false;
 
     while (running) {
         std::string line;
@@ -242,7 +272,7 @@ int main(int argc, char *argv[]) {
 
             handler = new ConnectionHandler(host, port);
             if (!handler->connect()) {
-                std::cerr << "could not connect\n";
+                std::cerr << "Could not connect to server" << std::endl;
                 delete handler;
                 handler = nullptr;
                 continue;
@@ -253,7 +283,7 @@ int main(int argc, char *argv[]) {
             // start listener thread
             if (!serverThread.joinable()) {
                 serverThread = std::thread([&](){
-                    listenToServer(*handler, db, running, shouldTerminate, activeUser, expectedReceiptId, receiptArrived, receiptMtx, receiptCv);
+                    listenToServer(*handler, db, running, shouldTerminate, activeUser, expectedReceiptId, receiptArrived, receiptMtx, receiptCv, loginMtx, loginCv, loginError, loginResponseReceived);
                 });
             }
 
@@ -266,6 +296,27 @@ int main(int argc, char *argv[]) {
 
             StompFrame connectFrame(FrameType::CONNECT, "", headers);
             sendFrame(*handler, connectFrame);
+            
+            // Wait for server response (CONNECTED or ERROR) - indefinitely
+            {
+                std::unique_lock<std::mutex> lock(loginMtx);
+                loginCv.wait(lock, [&] { return loginResponseReceived; });
+                loginResponseReceived = false;
+            }
+            
+            // If connection failed, clean up
+            if (!running) {
+                if (serverThread.joinable()) {
+                    serverThread.join();
+                }
+                if (handler != nullptr) {
+                    handler->close();
+                    delete handler;
+                    handler = nullptr;
+                }
+                activeUser = "";
+                running = true;
+            }
         }
 
         else if (cmd == "join") {
@@ -435,7 +486,6 @@ int main(int argc, char *argv[]) {
             
             // graceful shut down
             shouldTerminate = true;
-            running = false;
 
 
             if (serverThread.joinable()) {
@@ -446,14 +496,22 @@ int main(int argc, char *argv[]) {
             delete handler;
             handler = nullptr;
 
-            
+            // Reset state for next login
+            activeUser = "";
+            gameToSubId.clear();
+            shouldTerminate = false;
+            disconnecting.store(false);
+
+            // restart listener thread readiness
+            if (serverThread.joinable()) {
+                serverThread.detach();
+            }
 
             // close socket after we get RECEIPT
             //if (handler != nullptr) {
                
             //}
             std::cout << "Disconnected\n";
-            break;
 
         }
 
