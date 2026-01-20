@@ -12,6 +12,9 @@
 #include <unordered_map>
 #include <vector>
 
+std::atomic<bool> disconnecting(false);
+
+
 // gets the game from the destination (converts "/topic/gameName" to "gameName")
 static std::string getGameFromDestination(const std::string& dest) {
     std::string prefix = "/topic/";
@@ -88,10 +91,21 @@ static void listenToServer(ConnectionHandler& handler,
                            std::mutex& receiptMtx,
                            std::condition_variable& receiptCv)
 {
-    while (running) {
+    while (running && !shouldTerminate) {
         std::string raw_str;
         if (!handler.getFrameAscii(raw_str, '\0')) {
+            //if (!disconnecting) {
+            //    std::cerr << "recv failed (Error: End of file)\n";
+            //}
             //running = false;
+            if (disconnecting) {
+                std::lock_guard<std::mutex> lock(receiptMtx);
+                receiptArrived = true;   // unblock logout
+                receiptCv.notify_all();
+            } else {
+                std::cerr << "recv failed (Error: End of file)\n";
+            }
+
             break;
         }
 
@@ -136,9 +150,10 @@ static void listenToServer(ConnectionHandler& handler,
             std::cerr << "ERROR from server:\n" << frame.getBody() << std::endl;
         } */
         else if (frame.getType() == FrameType::ERROR) {
-            if (!shouldTerminate) {
+            if (!disconnecting) {
                 std::cerr << "ERROR from server:\n" << frame.getBody() << std::endl;
             }
+            break;
         }
 
         if (shouldTerminate) {
@@ -342,13 +357,38 @@ int main(int argc, char *argv[]) {
             if (handler == nullptr) 
 				break;
 
+            disconnecting = true;
+
         // reset receipt
         
-            receiptMtx.lock();
+            /* receiptMtx.lock();
             receiptArrived = false;
             expectedReceiptId = std::to_string(nextReceiptId++);
-            receiptMtx.unlock();
-        
+            receiptMtx.unlock(); */
+
+            //shouldTerminate = true;
+
+
+            //unsubscribe from all first
+            for (auto &pair : gameToSubId) {
+                StompFrame unsub(
+                    FrameType::UNSUBSCRIBE,
+                    "",
+                    {{"id", pair.second}}
+                );
+                sendFrame(*handler, unsub);
+            }
+            gameToSubId.clear();
+
+
+            //prepare reciept
+            {
+                std::lock_guard<std::mutex> lock(receiptMtx);
+                receiptArrived = false;
+                expectedReceiptId = std::to_string(nextReceiptId++);
+            }
+
+
 
             // send DISCONNECT with receipt header
             std::vector<StompFrame::Header> headers;
@@ -363,23 +403,39 @@ int main(int argc, char *argv[]) {
             {
                 std::unique_lock<std::mutex> lock(receiptMtx);
 
-                while (!receiptArrived) {
-                    receiptCv.wait(lock);
-                }
+                //while (!receiptArrived) {
+                //    receiptCv.wait(lock);
+                //}
+                receiptCv.wait(lock, [&] { return receiptArrived; });
+
             }
 
+            
+            //break;
+
+            
             // graceful shut down
             shouldTerminate = true;
             running = false;
-            break;
+
+
+            if (serverThread.joinable()) {
+                serverThread.join();
+            }
+
+            handler->close();
+            delete handler;
+            handler = nullptr;
+
+            
 
             // close socket after we get RECEIPT
-            if (handler != nullptr) {
-                handler->close();
-                delete handler;
-                handler = nullptr;
-                std::cout << "Disconnected\n";
-            }
+            //if (handler != nullptr) {
+               
+            //}
+            std::cout << "Disconnected\n";
+            break;
+
         }
 
 	else {
