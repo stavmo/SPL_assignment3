@@ -132,11 +132,12 @@ public class Database {
 	public void logout(int connectionsId) {
 		User user = connectionsIdMap.get(connectionsId);
 		if (user != null) {
-			// Log logout in SQL
+			// Log logout in SQL using subquery (SQLite compatible)
 			String sql = String.format(
 				"UPDATE login_history SET logout_time=datetime('now') " +
+				"WHERE id = (SELECT id FROM login_history " +
 				"WHERE username='%s' AND logout_time IS NULL " +
-				"ORDER BY login_time DESC LIMIT 1",
+				"ORDER BY login_time DESC LIMIT 1)",
 				escapeSql(user.name)
 			);
 			executeSQL(sql);

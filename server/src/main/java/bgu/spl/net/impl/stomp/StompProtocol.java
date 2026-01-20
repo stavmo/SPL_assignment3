@@ -42,10 +42,10 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
                 return;
             }
 
+            loggedIn = false;
             database.logout(connectionId);
             connections.send(connectionId, receipt);
-            //connections.disconnect(connectionId);
-            loggedIn = false;
+            connections.disconnect(connectionId);
             shouldTerminate = true;
             return;
         }
