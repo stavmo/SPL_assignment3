@@ -37,6 +37,10 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
             receipt = generateReceipt(receiptHeader);   
 
         if (message.getType() == FrameType.DISCONNECT) {
+
+            System.out.println("SERVER DISCONNECT receipt=" +
+                        (receiptHeader == null ? "null" : receiptHeader.getValue()));
+
             if (receiptHeader == null) {
                 terminate(null, "didn't provide receipt-id for DISCONNECT", "");
                 return;
@@ -183,7 +187,7 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
 
     private void terminate(StompFrame.Header source, String message, String body) {
         connections.send(connectionId, generateError(source, message, body));
-        connections.disconnect(connectionId);
+        //connections.disconnect(connectionId);
         shouldTerminate = true;
         loggedIn = false;
     }
@@ -192,13 +196,17 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
         Vector<StompFrame.Header> headers = new Vector<StompFrame.Header>();
         headers.add(new StompFrame.Header("receipt-id", Integer.toString(id)));
 
+
         return new StompFrame(FrameType.RECEIPT, "", headers);
     }
 
-    private StompFrame generateReceipt(StompFrame.Header id) {
-        Vector<StompFrame.Header> headers = new Vector<StompFrame.Header>();
-        headers.add(id);
-        return new StompFrame(FrameType.RECEIPT, "", headers);
+    private StompFrame generateReceipt(StompFrame.Header source) {
+    Vector<StompFrame.Header> headers = new Vector<>();
+    headers.add(new StompFrame.Header(
+        "receipt-id",
+        source.getValue()
+    ));
+    return new StompFrame(FrameType.RECEIPT, "", headers);
     }
 
     private StompFrame generateError(StompFrame.Header source, String message, String body) {

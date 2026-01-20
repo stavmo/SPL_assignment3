@@ -98,16 +98,18 @@ static void listenToServer(ConnectionHandler& handler,
             //    std::cerr << "recv failed (Error: End of file)\n";
             //}
             //running = false;
-            if (disconnecting) {
-                std::lock_guard<std::mutex> lock(receiptMtx);
-                receiptArrived = true;   // unblock logout
-                receiptCv.notify_all();
-            } else {
+            if (!disconnecting.load()) {
                 std::cerr << "recv failed (Error: End of file)\n";
+            }   
+        
+            else {
+                std::lock_guard<std::mutex> lock(receiptMtx);
+                receiptArrived = true;
+                receiptCv.notify_all();
             }
-
             break;
         }
+    
 
         // constructor expects STOMP frame string
         StompFrame frame(raw_str + '\0');
@@ -139,27 +141,40 @@ static void listenToServer(ConnectionHandler& handler,
         }
         else if (frame.getType() == FrameType::RECEIPT) {
             std::string receiptId = frame.getHeaderValue("receipt-id");
-            if (receiptId == expectedReceiptId) {
-                receiptMtx.lock();
-                receiptArrived = true;
+            std::string expectedCopy;
+            {
+                    std::lock_guard<std::mutex> lock(receiptMtx);
+                    expectedCopy = expectedReceiptId;;
+            }
+            if (receiptId == expectedCopy) {
+                /* receiptMtx.lock();
+                //receiptArrived = true;
+                receiptArrived.store(true);
                 receiptCv.notify_all();
-                receiptMtx.unlock();
+                receiptMtx.unlock(); */
+
+                
+                std::lock_guard<std::mutex> lock(receiptMtx);
+                receiptArrived = true;
+                
+                receiptCv.notify_all();
             }
         }
+        
         /* else if (frame.getType() == FrameType::ERROR) {
             std::cerr << "ERROR from server:\n" << frame.getBody() << std::endl;
         } */
         else if (frame.getType() == FrameType::ERROR) {
-            if (!disconnecting) {
+            if (!disconnecting.load()) {
                 std::cerr << "ERROR from server:\n" << frame.getBody() << std::endl;
             }
             break;
         }
 
-        if (shouldTerminate) {
+        /* if (shouldTerminate) {
             running = false;
             break;
-        }
+        } */
     }
 }
 
@@ -332,7 +347,7 @@ int main(int argc, char *argv[]) {
                 sendFrame(*handler, sendF);
             }
 
-            std::cout << "DEBUG SEND destination = " << dest << std::endl;
+            //std::cout << "DEBUG SEND destination = " << dest << std::endl;
             std::cout << "Sent reports to " << gameName << " game\n";
         }
 
@@ -357,7 +372,8 @@ int main(int argc, char *argv[]) {
             if (handler == nullptr) 
 				break;
 
-            disconnecting = true;
+            //disconnecting = true;
+            disconnecting.store(true);
 
         // reset receipt
         
@@ -402,14 +418,17 @@ int main(int argc, char *argv[]) {
             //main thread (keyboard) sleeps while waiting for the RECEIPT, listener thread gets the RECEIPT and updates receiptArrived, then wakes up main
             {
                 std::unique_lock<std::mutex> lock(receiptMtx);
+                receiptCv.wait(lock, [&] { return receiptArrived; });
 
-                if (!receiptArrived) {
+                //if (!receiptArrived) {
                 //    receiptCv.wait(lock);
                 //
-                    receiptCv.wait(lock, [&] { return receiptArrived; });
-                }
+                    
+            
+                    
+                //}
+            
             }
-
             
             //break;
 

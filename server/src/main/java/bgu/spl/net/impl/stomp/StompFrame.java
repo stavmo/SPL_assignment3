@@ -20,7 +20,8 @@ public class StompFrame {
 
     public StompFrame(FrameType type, String body, Vector<Header> headers) {
         this.type = type;
-        this.body = body;
+        //this.body = body;
+        this.body = (body == null) ? "" : body;
         this.headers = headers;
         for (Header header: headers) {
             if ("receipt-id".equals(header.getKey())) {
@@ -37,21 +38,25 @@ public class StompFrame {
             rawFrame = rawFrame.substring(0, rawFrame.length() - 1);
         }
         headers = new Vector<>();
-        String[] lines = rawFrame.split("\n");
+        //String[] lines = rawFrame.split("\n");
+        String[] lines = rawFrame.split("\n", -1);
         type = FrameType.valueOf(lines[0]);
         int i = 1;
-        while (i < lines.length && lines[i].contains(":")) {
+       /*  while (i < lines.length && lines[i].contains(":")) {
             String[] keyValue = lines[i].split(":", 2);
             headers.add(new Header(keyValue[0], keyValue[1]));
             i++;
         }
+        i++;
         String bodyStr = "";
         while (i < lines.length) {
             bodyStr += lines[i];
             if (i < lines.length - 1) {
                 bodyStr += "\n";
             }
-            i++;
+            if (i < lines.length && lines[i].isEmpty()) {
+                i++;
+            }
         }
         // Add final newline before null terminator (part of the frame format)
         if (bodyStr.length() > 0) {
@@ -65,12 +70,33 @@ public class StompFrame {
                 hasReceipt = true;
                 break;
             }
+        } */
+
+        while (i < lines.length && lines[i].contains(":")) {
+            String[] keyValue = lines[i].split(":", 2);
+            headers.add(new Header(keyValue[0], keyValue[1]));
+            i++;
         }
+
+        // skip exactly one empty line (the separator)
+
+        if (i < lines.length && lines[i].isEmpty()) {
+            i++;
+        }
+
+        StringBuilder bodySb = new StringBuilder();
+        while (i < lines.length) {
+            bodySb.append(lines[i]);
+            if (i < lines.length - 1) bodySb.append("\n");
+                i++;
+        }
+
+        body = bodySb.toString();
     }
 
     @Override
     public String toString() {
-        String str = "";
+        /* String str = "";
         str += type.toString() + "\n";
         for (int i = 0; i < headers.size(); i++) {
             Header header = headers.get(i);
@@ -79,7 +105,27 @@ public class StompFrame {
         str += body + "\n";
         str += "\0";
 
-        return str;
+        return str; */
+
+        StringBuilder sb = new StringBuilder();
+
+        // command line
+        sb.append(type.toString()).append('\n');
+
+        // headers
+        for (Header h : headers) {
+            sb.append(h.getKey()).append(':').append(h.getValue()).append('\n');
+        }
+
+        // blank line between headers and body
+        sb.append('\n');
+
+        // body (as-is)
+        //if (body != null) {
+        sb.append(body);
+        //}
+
+        return sb.toString();
     }
 
     public FrameType getType() {
@@ -94,17 +140,18 @@ public class StompFrame {
         return headers;
     }
 
-    public boolean hasReceipt() {
+  /*   public boolean hasReceipt() {
         return hasReceipt;
-    }
+    } */
 
     public Header getReceipt() {
-        if (hasReceipt) {
-            for (Header header : headers) {
-                if (header.key.equals("receipt-id"))
-                    return header;
-            }
+        //if (hasReceipt) {
+        for (Header header : headers) {
+            //if (header.key.equals("receipt-id"))
+            if ("receipt".equals(header.getKey()))
+                return header;
         }
+        //}
         return null;
     }
 
@@ -118,8 +165,8 @@ public class StompFrame {
     }
 
     public static class Header {
-        private String key;
-        private String value;
+        private final String key;
+        private final String value;
 
         public Header(String key, String value) {
             this.key = key;

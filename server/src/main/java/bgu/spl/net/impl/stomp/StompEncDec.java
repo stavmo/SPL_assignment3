@@ -28,7 +28,11 @@ public class StompEncDec implements MessageEncoderDecoder<StompFrame> {
      * Encode a frame using UTF-8.
      */
     public byte[] encode(StompFrame message) {
-        return message.toString().getBytes();
+        //return message.toString().getBytes();
+        String s = message.toString();
+        if (!s.endsWith("\0"))
+            s = s + "\0";
+        return s.getBytes(StandardCharsets.UTF_8);
     }
 
     private void pushByte(byte nextByte) {
