@@ -403,11 +403,11 @@ int main(int argc, char *argv[]) {
             {
                 std::unique_lock<std::mutex> lock(receiptMtx);
 
-                //while (!receiptArrived) {
+                if (!receiptArrived) {
                 //    receiptCv.wait(lock);
-                //}
-                receiptCv.wait(lock, [&] { return receiptArrived; });
-
+                //
+                    receiptCv.wait(lock, [&] { return receiptArrived; });
+                }
             }
 
             
