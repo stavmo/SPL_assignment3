@@ -61,11 +61,6 @@ const std::string &Event::get_description() const
     return this->description;
 }
 
-/* Event::Event(const std::string &frame_body) : team_a_name(""), team_b_name(""), name(""), time(0), game_updates(), team_a_updates(), team_b_updates(), description("")
-//{
-//}
- */
-
 Event::Event(const std::string &frame_body)
     : team_a_name(""), team_b_name(""), name(""), time(0),
       game_updates(), team_a_updates(), team_b_updates(), description("")
@@ -138,9 +133,6 @@ Event::Event(const std::string &frame_body)
         // ignore other lines (like "user:xyz" if it exists)
     }
 }
-
-
-
 
 names_and_events parseEventsFile(std::string json_path)
 {

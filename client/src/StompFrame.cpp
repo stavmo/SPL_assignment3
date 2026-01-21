@@ -70,8 +70,6 @@ std::string StompFrame::toString() const {
     result += body + "\n";
     
     // Null terminator
-    //result += '\0';
-    
     return result;
 }
 
