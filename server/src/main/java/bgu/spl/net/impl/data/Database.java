@@ -4,6 +4,9 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class Database {
@@ -72,9 +75,11 @@ public class Database {
 		}
 		if (addNewUserCase(connectionId, username, password)) {
 			// Log new user registration in SQL
+			String timestamp = LocalDateTime.now(ZoneOffset.ofHours(2))
+				.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 			String sql = String.format(
-				"INSERT INTO users (username, password, registration_date) VALUES ('%s', '%s', datetime('now'))",
-				escapeSql(username), escapeSql(password)
+				"INSERT INTO users (username, password, registration_date) VALUES ('%s', '%s', '%s')",
+				escapeSql(username), escapeSql(password), timestamp
 			);
 			executeSQL(sql);
 			
@@ -92,9 +97,11 @@ public class Database {
 	}
 
 	private void logLogin(String username) {
+		String timestamp = LocalDateTime.now(ZoneOffset.ofHours(2))
+			.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 		String sql = String.format(
-			"INSERT INTO login_history (username, login_time) VALUES ('%s', datetime('now'))",
-			escapeSql(username)
+			"INSERT INTO login_history (username, login_time) VALUES ('%s', '%s')",
+			escapeSql(username), timestamp
 		);
 		executeSQL(sql);
 	}
@@ -133,12 +140,14 @@ public class Database {
 		User user = connectionsIdMap.get(connectionsId);
 		if (user != null) {
 			// Log logout in SQL using subquery (SQLite compatible)
+			String timestamp = LocalDateTime.now(ZoneOffset.ofHours(2))
+				.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 			String sql = String.format(
-				"UPDATE login_history SET logout_time=datetime('now') " +
+				"UPDATE login_history SET logout_time='%s' " +
 				"WHERE id = (SELECT id FROM login_history " +
 				"WHERE username='%s' AND logout_time IS NULL " +
 				"ORDER BY login_time DESC LIMIT 1)",
-				escapeSql(user.name)
+				timestamp, escapeSql(user.name)
 			);
 			executeSQL(sql);
 			
