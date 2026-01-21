@@ -425,12 +425,28 @@ int main(int argc, char *argv[]) {
             for (const Event& ev : parsed.events) {
                 std::string body = buildEventBody(ev, activeUser);
 
+                // prepare unique receipt id for this SEND and wait for it
+                std::string thisReceiptId;
+                {
+                    std::lock_guard<std::mutex> lock(receiptMtx);
+                    receiptArrived = false;
+                    thisReceiptId = std::to_string(nextReceiptId++);
+                    expectedReceiptId = thisReceiptId;
+                }
+
                 std::vector<StompFrame::Header> headers;
                 headers.push_back({"destination", dest});
                 headers.push_back({"filename", jsonFile});
+                headers.push_back({"receipt", thisReceiptId});
 
                 StompFrame sendF(FrameType::SEND, body, headers);
                 sendFrame(*handler, sendF);
+
+                // Block until server acknowledges processing (DB logging + publish)
+                {
+                    std::unique_lock<std::mutex> lock(receiptMtx);
+                    receiptCv.wait(lock, [&] { return receiptArrived; });
+                }
             }
 
             //std::cout << "DEBUG SEND destination = " << dest << std::endl;
