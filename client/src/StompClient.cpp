@@ -11,9 +11,19 @@
 #include <atomic>
 #include <unordered_map>
 #include <vector>
+#include <cctype>
+#include <fstream>
 
 std::atomic<bool> disconnecting(false);
 
+//removed space before filename (because getline keeps the space after "report") 
+static std::string trim(std::string s) {
+    while (!s.empty() && std::isspace((unsigned char)s.front())) 
+        s.erase(s.begin());
+    while (!s.empty() && std::isspace((unsigned char)s.back()))  
+        s.pop_back();
+    return s;
+}
 
 // gets the game from the destination (converts "/topic/gameName" to "gameName")
 static std::string getGameFromDestination(const std::string& dest) {
@@ -24,7 +34,6 @@ static std::string getGameFromDestination(const std::string& dest) {
     return dest;
 }
 
-//StompFrame::toString() already adds '\0' and ConnectionHandler::sendFrameAscii adds too, so we remove the last '\0'
 static bool sendFrame(ConnectionHandler& handler, const StompFrame& frame) {
     std::string s = frame.toString();
     if (!s.empty() && s.back() == '\0') {
@@ -89,15 +98,15 @@ static void listenToServer(ConnectionHandler& handler,
 						   std::string& expectedReceiptId,
                            bool& receiptArrived,
                            std::mutex& receiptMtx,
-                           std::condition_variable& receiptCv)
+                           std::condition_variable& receiptCv,
+                           std::mutex& loginMtx,
+                           std::condition_variable& loginCv,
+                           std::string& loginError,
+                           bool& loginResponseReceived)
 {
     while (running && !shouldTerminate) {
         std::string raw_str;
         if (!handler.getFrameAscii(raw_str, '\0')) {
-            //if (!disconnecting) {
-            //    std::cerr << "recv failed (Error: End of file)\n";
-            //}
-            //running = false;
             if (!disconnecting.load()) {
                 std::cerr << "recv failed (Error: End of file)\n";
             }   
@@ -109,7 +118,6 @@ static void listenToServer(ConnectionHandler& handler,
             }
             break;
         }
-    
 
         // constructor expects STOMP frame string
         StompFrame frame(raw_str + '\0');
@@ -147,13 +155,6 @@ static void listenToServer(ConnectionHandler& handler,
                     expectedCopy = expectedReceiptId;;
             }
             if (receiptId == expectedCopy) {
-                /* receiptMtx.lock();
-                //receiptArrived = true;
-                receiptArrived.store(true);
-                receiptCv.notify_all();
-                receiptMtx.unlock(); */
-
-                
                 std::lock_guard<std::mutex> lock(receiptMtx);
                 receiptArrived = true;
                 
@@ -161,20 +162,41 @@ static void listenToServer(ConnectionHandler& handler,
             }
         }
         
-        /* else if (frame.getType() == FrameType::ERROR) {
-            std::cerr << "ERROR from server:\n" << frame.getBody() << std::endl;
-        } */
-        else if (frame.getType() == FrameType::ERROR) {
-            if (!disconnecting.load()) {
-                std::cerr << "ERROR from server:\n" << frame.getBody() << std::endl;
+        else if (frame.getType() == FrameType::CONNECTED) {
+            std::cout << "Login successful" << std::endl;
+            {
+                std::lock_guard<std::mutex> lock(loginMtx);
+                loginResponseReceived = true;
+                loginError = "";
             }
-            break;
+            loginCv.notify_all();
         }
-
-        /* if (shouldTerminate) {
+        else if (frame.getType() == FrameType::ERROR) {
+            std::string errorBody = frame.getBody();
+            std::string errorMsg = frame.getHeaderValue("message");
+            
+            if (errorMsg.find("User already logged in") != std::string::npos) {
+                std::cerr << "User already logged in" << std::endl;
+            }
+            else if (errorMsg.find("Wrong password") != std::string::npos) {
+                std::cerr << "Wrong password" << std::endl;
+            }
+            else if (!errorMsg.empty()) {
+                std::cerr << errorMsg << std::endl;
+            }
+            else if (!errorBody.empty()) {
+                std::cerr << errorBody << std::endl;
+            }
+            
+            {
+                std::lock_guard<std::mutex> lock(loginMtx);
+                loginResponseReceived = true;
+                loginError = errorMsg.empty() ? errorBody : errorMsg;
+            }
+            loginCv.notify_all();
             running = false;
             break;
-        } */
+        }
     }
 }
 
@@ -193,11 +215,16 @@ int main(int argc, char *argv[]) {
     ConnectionHandler* handler = nullptr;
     std::thread serverThread;
 
-	std::mutex receiptMtx;
-	std::condition_variable receiptCv;
-	bool receiptArrived = false;
-	std::string expectedReceiptId = "";
-	int nextReceiptId = 1;
+    std::mutex receiptMtx;
+    std::condition_variable receiptCv;
+    bool receiptArrived = false;
+    std::string expectedReceiptId = "";
+    int nextReceiptId = 1;
+
+    std::mutex loginMtx;
+    std::condition_variable loginCv;
+    std::string loginError = "";
+    bool loginResponseReceived = false;
 
     while (running) {
         std::string line;
@@ -242,7 +269,7 @@ int main(int argc, char *argv[]) {
 
             handler = new ConnectionHandler(host, port);
             if (!handler->connect()) {
-                std::cerr << "could not connect\n";
+                std::cerr << "Could not connect to server" << std::endl;
                 delete handler;
                 handler = nullptr;
                 continue;
@@ -253,7 +280,7 @@ int main(int argc, char *argv[]) {
             // start listener thread
             if (!serverThread.joinable()) {
                 serverThread = std::thread([&](){
-                    listenToServer(*handler, db, running, shouldTerminate, activeUser, expectedReceiptId, receiptArrived, receiptMtx, receiptCv);
+                    listenToServer(*handler, db, running, shouldTerminate, activeUser, expectedReceiptId, receiptArrived, receiptMtx, receiptCv, loginMtx, loginCv, loginError, loginResponseReceived);
                 });
             }
 
@@ -266,6 +293,27 @@ int main(int argc, char *argv[]) {
 
             StompFrame connectFrame(FrameType::CONNECT, "", headers);
             sendFrame(*handler, connectFrame);
+            
+            // Wait for server response (CONNECTED or ERROR) - indefinitely
+            {
+                std::unique_lock<std::mutex> lock(loginMtx);
+                loginCv.wait(lock, [&] { return loginResponseReceived; });
+                loginResponseReceived = false;
+            }
+            
+            // If connection failed, clean up
+            if (!running) {
+                if (serverThread.joinable()) {
+                    serverThread.join();
+                }
+                if (handler != nullptr) {
+                    handler->close();
+                    delete handler;
+                    handler = nullptr;
+                }
+                activeUser = "";
+                running = true;
+            }
         }
 
         else if (cmd == "join") {
@@ -324,30 +372,61 @@ int main(int argc, char *argv[]) {
 
             // report command looks like : {file}
             std::string jsonFile;
-            std::getline(iss, jsonFile);  //store from there the rest in "jsonFile"
+            std::getline(iss, jsonFile);  //store the line after the first space as "jsonFile"
+
+            jsonFile = trim(jsonFile);
+
 
             if (jsonFile.empty()) 
 				continue;
+
+            // If user didn't join any channel yet, block report BEFORE parsing the file
+            if (gameToSubId.empty()) {
+                std::cerr << "You must join a game before reporting.\n";
+                continue;
+            }
 
             names_and_events parsed = parseEventsFile(jsonFile);
             // Use the same game name the user joined
             // Assume user joined with team_a_team_b format
             std::string gameName =
                 parsed.team_a_name + "_" + parsed.team_b_name;
+
+
+            if (gameToSubId.find(gameName) == gameToSubId.end()) {
+                std::cerr << "You must join " << gameName << " before reporting.\n";
+                continue;
+            }
+            
             std::string dest = "/topic/" + gameName;
 
             for (const Event& ev : parsed.events) {
                 std::string body = buildEventBody(ev, activeUser);
 
+                // prepare unique receipt id for this SEND and wait for it
+                std::string thisReceiptId;
+                {
+                    std::lock_guard<std::mutex> lock(receiptMtx);
+                    receiptArrived = false;
+                    thisReceiptId = std::to_string(nextReceiptId++);
+                    expectedReceiptId = thisReceiptId;
+                }
+
                 std::vector<StompFrame::Header> headers;
                 headers.push_back({"destination", dest});
                 headers.push_back({"filename", jsonFile});
+                headers.push_back({"receipt", thisReceiptId});
 
                 StompFrame sendF(FrameType::SEND, body, headers);
                 sendFrame(*handler, sendF);
+
+                // Block until server acknowledges processing (DB logging + publish)
+                {
+                    std::unique_lock<std::mutex> lock(receiptMtx);
+                    receiptCv.wait(lock, [&] { return receiptArrived; });
+                }
             }
 
-            //std::cout << "DEBUG SEND destination = " << dest << std::endl;
             std::cout << "Sent reports to " << gameName << " game\n";
         }
 
@@ -372,18 +451,7 @@ int main(int argc, char *argv[]) {
             if (handler == nullptr) 
 				break;
 
-            //disconnecting = true;
             disconnecting.store(true);
-
-        // reset receipt
-        
-            /* receiptMtx.lock();
-            receiptArrived = false;
-            expectedReceiptId = std::to_string(nextReceiptId++);
-            receiptMtx.unlock(); */
-
-            //shouldTerminate = true;
-
 
             //unsubscribe from all first
             for (auto &pair : gameToSubId) {
@@ -396,15 +464,12 @@ int main(int argc, char *argv[]) {
             }
             gameToSubId.clear();
 
-
             //prepare reciept
             {
                 std::lock_guard<std::mutex> lock(receiptMtx);
                 receiptArrived = false;
                 expectedReceiptId = std::to_string(nextReceiptId++);
             }
-
-
 
             // send DISCONNECT with receipt header
             std::vector<StompFrame::Header> headers;
@@ -414,28 +479,17 @@ int main(int argc, char *argv[]) {
             sendFrame(*handler, disc);
 
             // waits until server sends RECEIPT with matching receipt-id
-            // we use unique_lock here because it lets the thread sleep without holding the lock, and then lock it again when it wakes up
-            //main thread (keyboard) sleeps while waiting for the RECEIPT, listener thread gets the RECEIPT and updates receiptArrived, then wakes up main
+            // we use unique_lock here because it lets the thread sleep without holding the lock, and then 
+            //lock it again when it wakes up
+            //main thread (keyboard) sleeps while waiting for the RECEIPT, listener thread gets the RECEIPT 
+            // and updates receiptArrived, then wakes up main
             {
                 std::unique_lock<std::mutex> lock(receiptMtx);
                 receiptCv.wait(lock, [&] { return receiptArrived; });
-
-                //if (!receiptArrived) {
-                //    receiptCv.wait(lock);
-                //
-                    
-            
-                    
-                //}
-            
             }
-            
-            //break;
-
-            
+                        
             // graceful shut down
             shouldTerminate = true;
-            running = false;
 
 
             if (serverThread.joinable()) {
@@ -446,14 +500,18 @@ int main(int argc, char *argv[]) {
             delete handler;
             handler = nullptr;
 
-            
+            // Reset state for next login
+            activeUser = "";
+            gameToSubId.clear();
+            shouldTerminate = false;
+            disconnecting.store(false);
 
-            // close socket after we get RECEIPT
-            //if (handler != nullptr) {
-               
-            //}
+            // restart listener thread readiness
+            if (serverThread.joinable()) {
+                serverThread.detach();
+            }
+
             std::cout << "Disconnected\n";
-            break;
 
         }
 

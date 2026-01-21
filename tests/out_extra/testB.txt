@@ -1,0 +1,7 @@
+Starting connect to 127.0.0.1:7777
+Login successful
+Joined channel Germany_Japan
+Joined channel Foo_Bar
+Exited channel Germany_Japan
+You must join Germany_Japan before reporting.
+Disconnected
