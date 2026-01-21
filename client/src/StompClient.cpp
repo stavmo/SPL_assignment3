@@ -34,7 +34,6 @@ static std::string getGameFromDestination(const std::string& dest) {
     return dest;
 }
 
-//StompFrame::toString() already adds '\0' and ConnectionHandler::sendFrameAscii adds too, so we remove the last '\0'
 static bool sendFrame(ConnectionHandler& handler, const StompFrame& frame) {
     std::string s = frame.toString();
     if (!s.empty() && s.back() == '\0') {
@@ -108,10 +107,6 @@ static void listenToServer(ConnectionHandler& handler,
     while (running && !shouldTerminate) {
         std::string raw_str;
         if (!handler.getFrameAscii(raw_str, '\0')) {
-            //if (!disconnecting) {
-            //    std::cerr << "recv failed (Error: End of file)\n";
-            //}
-            //running = false;
             if (!disconnecting.load()) {
                 std::cerr << "recv failed (Error: End of file)\n";
             }   
@@ -123,7 +118,6 @@ static void listenToServer(ConnectionHandler& handler,
             }
             break;
         }
-    
 
         // constructor expects STOMP frame string
         StompFrame frame(raw_str + '\0');
@@ -161,13 +155,6 @@ static void listenToServer(ConnectionHandler& handler,
                     expectedCopy = expectedReceiptId;;
             }
             if (receiptId == expectedCopy) {
-                /* receiptMtx.lock();
-                //receiptArrived = true;
-                receiptArrived.store(true);
-                receiptCv.notify_all();
-                receiptMtx.unlock(); */
-
-                
                 std::lock_guard<std::mutex> lock(receiptMtx);
                 receiptArrived = true;
                 
@@ -387,15 +374,6 @@ int main(int argc, char *argv[]) {
             std::string jsonFile;
             std::getline(iss, jsonFile);  //store the line after the first space as "jsonFile"
 
-            /* // trim leading spaces (because getline keeps the space after "report")
-            size_t first = jsonFile.find_first_not_of(" \t\r");
-            if (first == std::string::npos) 
-                continue; // line was only spaces
-            jsonFile.erase(0, first);
-
-            // trim trailing spaces too (optional but good)
-            size_t last = jsonFile.find_last_not_of(" \t\r");
-            jsonFile.erase(last + 1); */
             jsonFile = trim(jsonFile);
 
 
@@ -449,7 +427,6 @@ int main(int argc, char *argv[]) {
                 }
             }
 
-            //std::cout << "DEBUG SEND destination = " << dest << std::endl;
             std::cout << "Sent reports to " << gameName << " game\n";
         }
 
@@ -474,18 +451,7 @@ int main(int argc, char *argv[]) {
             if (handler == nullptr) 
 				break;
 
-            //disconnecting = true;
             disconnecting.store(true);
-
-        // reset receipt
-        
-            /* receiptMtx.lock();
-            receiptArrived = false;
-            expectedReceiptId = std::to_string(nextReceiptId++);
-            receiptMtx.unlock(); */
-
-            //shouldTerminate = true;
-
 
             //unsubscribe from all first
             for (auto &pair : gameToSubId) {
@@ -498,15 +464,12 @@ int main(int argc, char *argv[]) {
             }
             gameToSubId.clear();
 
-
             //prepare reciept
             {
                 std::lock_guard<std::mutex> lock(receiptMtx);
                 receiptArrived = false;
                 expectedReceiptId = std::to_string(nextReceiptId++);
             }
-
-
 
             // send DISCONNECT with receipt header
             std::vector<StompFrame::Header> headers;
@@ -516,25 +479,15 @@ int main(int argc, char *argv[]) {
             sendFrame(*handler, disc);
 
             // waits until server sends RECEIPT with matching receipt-id
-            // we use unique_lock here because it lets the thread sleep without holding the lock, and then lock it again when it wakes up
-            //main thread (keyboard) sleeps while waiting for the RECEIPT, listener thread gets the RECEIPT and updates receiptArrived, then wakes up main
+            // we use unique_lock here because it lets the thread sleep without holding the lock, and then 
+            //lock it again when it wakes up
+            //main thread (keyboard) sleeps while waiting for the RECEIPT, listener thread gets the RECEIPT 
+            // and updates receiptArrived, then wakes up main
             {
                 std::unique_lock<std::mutex> lock(receiptMtx);
                 receiptCv.wait(lock, [&] { return receiptArrived; });
-
-                //if (!receiptArrived) {
-                //    receiptCv.wait(lock);
-                //
-                    
-            
-                    
-                //}
-            
             }
-            
-            //break;
-
-            
+                        
             // graceful shut down
             shouldTerminate = true;
 
@@ -558,10 +511,6 @@ int main(int argc, char *argv[]) {
                 serverThread.detach();
             }
 
-            // close socket after we get RECEIPT
-            //if (handler != nullptr) {
-               
-            //}
             std::cout << "Disconnected\n";
 
         }
