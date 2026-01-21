@@ -1,0 +1,6 @@
+Starting connect to 127.0.0.1:7777
+Login successful
+Joined channel Germany_Japan
+Sent reports to Germany_Japan game
+wrote summary to tests/out_extra/summary_u1029323074.txt
+Disconnected

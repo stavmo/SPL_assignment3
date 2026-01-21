@@ -1,0 +1,6 @@
+Starting connect to 127.0.0.1:7777
+Login successful
+Joined channel Germany_Japan
+Exited channel Germany_Japan
+You must join a game before reporting.
+Disconnected

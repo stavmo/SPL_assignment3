@@ -188,9 +188,22 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
     private void terminate(StompFrame.Header source, String message, String body) {
         connections.send(connectionId, generateError(source, message, body));
         //connections.disconnect(connectionId);
+        //shouldTerminate = true;
+        //loggedIn = false;
+
+        // if this connection was logged in, make sure DB state is cleaned
+        if (loggedIn) {
+            database.logout(connectionId);
+            loggedIn = false;
+            currentUser = null;
+        }
+
+        // STOMP ERROR should close the connection
+        connections.disconnect(connectionId);
         shouldTerminate = true;
-        loggedIn = false;
     }
+
+    //HELPERS
 
     private StompFrame generateReceipt(int id) {
         Vector<StompFrame.Header> headers = new Vector<StompFrame.Header>();
@@ -223,5 +236,4 @@ public class StompProtocol implements StompMessagingProtocol<StompFrame> {
 
         return new StompFrame(FrameType.ERROR, body, headers);
     }
-
 }

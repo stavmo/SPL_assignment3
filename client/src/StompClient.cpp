@@ -11,9 +11,19 @@
 #include <atomic>
 #include <unordered_map>
 #include <vector>
+#include <cctype>
+#include <fstream>
 
 std::atomic<bool> disconnecting(false);
 
+//removed space before filename (because getline keeps the space after "report") 
+static std::string trim(std::string s) {
+    while (!s.empty() && std::isspace((unsigned char)s.front())) 
+        s.erase(s.begin());
+    while (!s.empty() && std::isspace((unsigned char)s.back()))  
+        s.pop_back();
+    return s;
+}
 
 // gets the game from the destination (converts "/topic/gameName" to "gameName")
 static std::string getGameFromDestination(const std::string& dest) {
@@ -375,10 +385,28 @@ int main(int argc, char *argv[]) {
 
             // report command looks like : {file}
             std::string jsonFile;
-            std::getline(iss, jsonFile);  //store from there the rest in "jsonFile"
+            std::getline(iss, jsonFile);  //store the line after the first space as "jsonFile"
+
+            /* // trim leading spaces (because getline keeps the space after "report")
+            size_t first = jsonFile.find_first_not_of(" \t\r");
+            if (first == std::string::npos) 
+                continue; // line was only spaces
+            jsonFile.erase(0, first);
+
+            // trim trailing spaces too (optional but good)
+            size_t last = jsonFile.find_last_not_of(" \t\r");
+            jsonFile.erase(last + 1); */
+            jsonFile = trim(jsonFile);
+
 
             if (jsonFile.empty()) 
 				continue;
+
+            // If user didn't join any channel yet, block report BEFORE parsing the file
+            if (gameToSubId.empty()) {
+                std::cerr << "You must join a game before reporting.\n";
+                continue;
+            }
 
             names_and_events parsed = parseEventsFile(jsonFile);
             // Use the same game name the user joined
