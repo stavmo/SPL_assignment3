@@ -1,5 +1,6 @@
 #include "../include/GameDB.h"
 #include <fstream>
+#include <iostream>
 #include <algorithm>
 
 void GameDB::addEvent(const std::string& gameName,
@@ -82,4 +83,57 @@ bool GameDB::writeSummaryToFile(const std::string& gameName,
     }
 
     return true;
+}
+
+void GameDB::printSummaryToConsole(const std::string& gameName,
+                                   const std::string& user) {
+    std::lock_guard<std::mutex> lock(mtx);
+
+    auto gameIt = db.find(gameName);
+    if (gameIt == db.end()) {
+        std::cout << "no info for game=" << gameName << " user=" << user << "\n";
+        return;
+    }
+
+    auto userIt = gameIt->second.find(user);
+    if (userIt == gameIt->second.end()) {
+        std::cout << "no info for game=" << gameName << " user=" << user << "\n";
+        return;
+    }
+
+    const GameSummaryData& data = userIt->second;
+
+    std::cout << data.teamA << " vs " << data.teamB << "\n";
+    std::cout << "Game stats:\n";
+
+    std::cout << "General stats:\n";
+    for (const auto& kv : data.generalStats) {
+        std::cout << kv.first << ": " << kv.second << "\n";
+    }
+    std::cout << "\n";
+
+    std::cout << data.teamA << " stats:\n";
+    for (const auto& kv : data.teamAStats) {
+        std::cout << kv.first << ": " << kv.second << "\n";
+    }
+    std::cout << "\n";
+
+    std::cout << data.teamB << " stats:\n";
+    for (const auto& kv : data.teamBStats) {
+        std::cout << kv.first << ": " << kv.second << "\n";
+    }
+    std::cout << "\n";
+
+    std::cout << "Game event reports:\n";
+
+    // print events by time order of the game
+    std::vector<EventReportLine> events = data.events;
+    std::sort(events.begin(), events.end(), [](const EventReportLine& a, const EventReportLine& b) {
+                  return a.time < b.time;
+              });
+
+    for (const auto& e : events) {
+        std::cout << e.time << " - " << e.name << ":\n";
+        std::cout << e.description << "\n\n";
+    }
 }

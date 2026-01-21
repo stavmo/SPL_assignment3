@@ -444,6 +444,7 @@ int main(int argc, char *argv[]) {
                 std::cerr << "no info for game=" << game << " user=" << user << "\n";
             } else {
                 std::cout << "wrote summary to " << outFile << "\n";
+                db.printSummaryToConsole(game, user);
             }
         }
 
