@@ -385,6 +385,13 @@ int main(int argc, char *argv[]) {
             // Assume user joined with team_a_team_b format
             std::string gameName =
                 parsed.team_a_name + "_" + parsed.team_b_name;
+
+
+            if (gameToSubId.find(gameName) == gameToSubId.end()) {
+                std::cerr << "You must join " << gameName << " before reporting.\n";
+                continue;
+            }
+            
             std::string dest = "/topic/" + gameName;
 
             for (const Event& ev : parsed.events) {
