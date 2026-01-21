@@ -39,4 +39,7 @@ public:
     bool writeSummaryToFile(const std::string& gameName,
                             const std::string& user,
                             const std::string& outFile);
+
+    void printSummaryToConsole(const std::string& gameName,
+                               const std::string& user);
 };
