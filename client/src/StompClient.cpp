@@ -1,5 +1,6 @@
 #include "../include/ConnectionHandler.h"
 #include "../include/StompFrame.h"
+#include "../include/StompProtocol.h"
 #include "../include/event.h"
 #include "../include/GameDB.h"
 
@@ -203,14 +204,12 @@ static void listenToServer(ConnectionHandler& handler,
 int main(int argc, char *argv[]) {
 
     GameDB db;
+    StompProtocol protocol;
 
     std::atomic<bool> running(true);
     std::atomic<bool> shouldTerminate(false);
 
     std::string activeUser = "";
-
-    std::unordered_map<std::string, std::string> gameToSubId;
-    int nextSubId = 1;
 
     ConnectionHandler* handler = nullptr;
     std::thread serverThread;
@@ -219,7 +218,6 @@ int main(int argc, char *argv[]) {
     std::condition_variable receiptCv;
     bool receiptArrived = false;
     std::string expectedReceiptId = "";
-    int nextReceiptId = 1;
 
     std::mutex loginMtx;
     std::condition_variable loginCv;
@@ -284,15 +282,13 @@ int main(int argc, char *argv[]) {
                 });
             }
 
-            // send CONNECT frame
-            std::vector<StompFrame::Header> headers;
-            headers.push_back({"accept-version", "1.2"});
-            headers.push_back({"host", host});
-            headers.push_back({"login", user});
-            headers.push_back({"passcode", pass});
-
-            StompFrame connectFrame(FrameType::CONNECT, "", headers);
+            // send CONNECT frame using protocol
+            StompFrame connectFrame = protocol.buildConnectFrame(host, user, pass);
             sendFrame(*handler, connectFrame);
+            
+            // Mark as logged in (pending server confirmation)
+            protocol.setLoggedIn(true, user);
+            activeUser = user;
             
             // Wait for server response (CONNECTED or ERROR) - indefinitely
             {
@@ -321,20 +317,16 @@ int main(int argc, char *argv[]) {
 				continue; }
 
             std::string game;
-            std::getline(iss, game); //start reading line, store that in "game"
+            std::getline(iss, game);
             if (game.empty()) 
 				continue;
 
             std::string dest = "/topic/" + game;
-            std::string subId = std::to_string(nextSubId++);
+            std::string subId = protocol.getNextSubscriptionId();
+            
+            protocol.addSubscription(game, subId);
 
-            gameToSubId[game] = subId;
-
-            std::vector<StompFrame::Header> headers;
-            headers.push_back({"destination", dest});
-            headers.push_back({"id", subId});
-
-            StompFrame subFrame(FrameType::SUBSCRIBE, "", headers);
+            StompFrame subFrame = protocol.buildSubscribeFrame(dest, subId);
             sendFrame(*handler, subFrame);
             std::cout << "Joined channel " << game << "\n";
         }
@@ -344,25 +336,21 @@ int main(int argc, char *argv[]) {
 				continue; }
 
             std::string game;
-            std::getline(iss, game); //start reading line, store that in "game"
+            std::getline(iss, game);
             if (game.empty()) 
 				continue;
 
-            auto it = gameToSubId.find(game);
-            if (it == gameToSubId.end()) {
+            if (!protocol.isSubscribedTo(game)) {
                 std::cerr << "not subscribed to " << game << "\n";
                 continue;
             }
 
-            std::string subId = it->second;
+            std::string subId = protocol.getSubscriptionId(game);
+            protocol.removeSubscription(game);
 
-            std::vector<StompFrame::Header> headers;
-            headers.push_back({"id", subId});
-
-            StompFrame unsub(FrameType::UNSUBSCRIBE, "", headers);
+            StompFrame unsub = protocol.buildUnsubscribeFrame(subId);
             sendFrame(*handler, unsub);
 
-            gameToSubId.erase(it);
             std::cout << "Exited channel " << game << "\n";
         }
 
@@ -370,30 +358,23 @@ int main(int argc, char *argv[]) {
             if (handler == nullptr) { std::cerr << "login first\n"; 
 				continue; }
 
-            // report command looks like : {file}
             std::string jsonFile;
-            std::getline(iss, jsonFile);  //store the line after the first space as "jsonFile"
-
+            std::getline(iss, jsonFile);
             jsonFile = trim(jsonFile);
-
 
             if (jsonFile.empty()) 
 				continue;
 
             // If user didn't join any channel yet, block report BEFORE parsing the file
-            if (gameToSubId.empty()) {
+            if (!protocol.gameToSubscriptionId.size()) {
                 std::cerr << "You must join a game before reporting.\n";
                 continue;
             }
 
             names_and_events parsed = parseEventsFile(jsonFile);
-            // Use the same game name the user joined
-            // Assume user joined with team_a_team_b format
-            std::string gameName =
-                parsed.team_a_name + "_" + parsed.team_b_name;
+            std::string gameName = parsed.team_a_name + "_" + parsed.team_b_name;
 
-
-            if (gameToSubId.find(gameName) == gameToSubId.end()) {
+            if (!protocol.isSubscribedTo(gameName)) {
                 std::cerr << "You must join " << gameName << " before reporting.\n";
                 continue;
             }
@@ -404,20 +385,14 @@ int main(int argc, char *argv[]) {
                 std::string body = buildEventBody(ev, activeUser);
 
                 // prepare unique receipt id for this SEND and wait for it
-                std::string thisReceiptId;
+                std::string thisReceiptId = protocol.getNextReceiptId();
                 {
                     std::lock_guard<std::mutex> lock(receiptMtx);
                     receiptArrived = false;
-                    thisReceiptId = std::to_string(nextReceiptId++);
                     expectedReceiptId = thisReceiptId;
                 }
 
-                std::vector<StompFrame::Header> headers;
-                headers.push_back({"destination", dest});
-                headers.push_back({"filename", jsonFile});
-                headers.push_back({"receipt", thisReceiptId});
-
-                StompFrame sendF(FrameType::SEND, body, headers);
+                StompFrame sendF = protocol.buildSendFrame(dest, body, jsonFile, thisReceiptId);
                 sendFrame(*handler, sendF);
 
                 // Block until server acknowledges processing (DB logging + publish)
@@ -453,36 +428,31 @@ int main(int argc, char *argv[]) {
 
             disconnecting.store(true);
 
-            //unsubscribe from all first
-            for (auto &pair : gameToSubId) {
-                StompFrame unsub(
-                    FrameType::UNSUBSCRIBE,
-                    "",
-                    {{"id", pair.second}}
-                );
+            // unsubscribe from all first
+            std::vector<std::string> subscribed;
+            for (const auto& pair : protocol.gameToSubscriptionId) {
+                subscribed.push_back(pair.first);
+            }
+            
+            for (const auto& game : subscribed) {
+                std::string subId = protocol.getSubscriptionId(game);
+                StompFrame unsub = protocol.buildUnsubscribeFrame(subId);
                 sendFrame(*handler, unsub);
             }
-            gameToSubId.clear();
+            protocol.clearAllSubscriptions();
 
-            //prepare reciept
+            // prepare receipt
             {
                 std::lock_guard<std::mutex> lock(receiptMtx);
                 receiptArrived = false;
-                expectedReceiptId = std::to_string(nextReceiptId++);
+                expectedReceiptId = protocol.getNextReceiptId();
             }
 
             // send DISCONNECT with receipt header
-            std::vector<StompFrame::Header> headers;
-            headers.push_back({"receipt", expectedReceiptId});
-
-            StompFrame disc(FrameType::DISCONNECT, "", headers);
+            StompFrame disc = protocol.buildDisconnectFrame(expectedReceiptId);
             sendFrame(*handler, disc);
 
             // waits until server sends RECEIPT with matching receipt-id
-            // we use unique_lock here because it lets the thread sleep without holding the lock, and then 
-            //lock it again when it wakes up
-            //main thread (keyboard) sleeps while waiting for the RECEIPT, listener thread gets the RECEIPT 
-            // and updates receiptArrived, then wakes up main
             {
                 std::unique_lock<std::mutex> lock(receiptMtx);
                 receiptCv.wait(lock, [&] { return receiptArrived; });
@@ -490,7 +460,6 @@ int main(int argc, char *argv[]) {
                         
             // graceful shut down
             shouldTerminate = true;
-
 
             if (serverThread.joinable()) {
                 serverThread.join();
@@ -502,7 +471,7 @@ int main(int argc, char *argv[]) {
 
             // Reset state for next login
             activeUser = "";
-            gameToSubId.clear();
+            protocol.setLoggedIn(false);
             shouldTerminate = false;
             disconnecting.store(false);
 
@@ -512,13 +481,12 @@ int main(int argc, char *argv[]) {
             }
 
             std::cout << "Disconnected\n";
-
         }
 
 	else {
 		std::cerr << "unknown command: " << cmd << "\n";
 	}
-}
+    }  // close while loop
 
     running = false;
  

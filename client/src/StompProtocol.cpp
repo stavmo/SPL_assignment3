@@ -34,13 +34,11 @@ StompFrame StompProtocol::buildSendFrame(const std::string& destination, const s
     return StompFrame(FrameType::SEND, body, headers);
 }
 
-StompFrame StompProtocol::buildSubscribeFrame(const std::string& destination)
+StompFrame StompProtocol::buildSubscribeFrame(const std::string& destination, const std::string& subscriptionId)
 {
-    std::string subId = getNextSubscriptionId();
-    
     std::vector<StompFrame::Header> headers;
     headers.push_back({"destination", destination});
-    headers.push_back({"id", subId});
+    headers.push_back({"id", subscriptionId});
 
     return StompFrame(FrameType::SUBSCRIBE, "", headers);
 }

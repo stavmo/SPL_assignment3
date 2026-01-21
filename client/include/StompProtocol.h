@@ -7,21 +7,16 @@
 
 class StompProtocol
 {
-private:
-    int nextReceiptId;
-    int nextSubscriptionId;
-    std::map<std::string, std::string> gameToSubscriptionId;  // game name -> subscription ID
-    bool isLoggedIn;
-    std::string currentUser;
-
 public:
+    std::map<std::string, std::string> gameToSubscriptionId;
+
     StompProtocol();
     ~StompProtocol();
 
     // Frame builders
     StompFrame buildConnectFrame(const std::string& host, const std::string& user, const std::string& passcode);
     StompFrame buildSendFrame(const std::string& destination, const std::string& body, const std::string& filename = "", const std::string& receiptId = "");
-    StompFrame buildSubscribeFrame(const std::string& destination);
+    StompFrame buildSubscribeFrame(const std::string& destination, const std::string& subscriptionId);
     StompFrame buildUnsubscribeFrame(const std::string& subscriptionId);
     StompFrame buildDisconnectFrame(const std::string& receiptId);
 
@@ -46,5 +41,11 @@ public:
     // Validation
     bool validateConnectResponse(const StompFrame& frame) const;
     bool validateMessageFrame(const StompFrame& frame) const;
+
+private:
+    int nextReceiptId;
+    int nextSubscriptionId;
+    bool isLoggedIn;
+    std::string currentUser;
 };
 
